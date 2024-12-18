@@ -2,11 +2,13 @@ use alloy_primitives::map::HashMap;
 use foundry_compilers_artifacts::Remapping;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     path::{Path, PathBuf},
 };
 
 use crate::{CompilerSettings, CompilerSettingsRestrictions};
+
+use super::compiler::ResolcCliSettings;
 
 /// This file contains functionality required by revive/resolc
 /// Some functions are stubbed but will be implemented as needed
@@ -21,9 +23,13 @@ pub struct ResolcOptimizer {
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]
 pub struct ResolcSettings {
-    optimizer: ResolcOptimizer,
+    pub optimizer: ResolcOptimizer,
     #[serde(rename = "outputSelection")]
-    outputselection: HashMap<String, HashMap<String, Vec<String>>>,
+    pub outputselection: HashMap<String, HashMap<String, Vec<String>>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub remappings: Vec<Remapping>,
+    #[serde(skip)]
+    pub resolc_settings: ResolcCliSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Copy)]
@@ -82,20 +88,41 @@ impl CompilerSettings for ResolcSettings {
         }
     }
 
-    fn with_remappings(self, _remappings: &[Remapping]) -> Self {
-        self
+    fn with_remappings(self, remappings: &[Remapping]) -> Self {
+        Self {
+            remappings: remappings.to_vec(),
+            ..self
+        }
     }
 
-    fn with_base_path(self, _base_path: &Path) -> Self {
-        self
+    fn with_base_path(self, base_path: &Path) -> Self {
+        Self {
+            resolc_settings: ResolcCliSettings {
+                base_path: Some(base_path.to_path_buf()),
+                ..self.resolc_settings
+            },
+            ..self
+        }
     }
 
-    fn with_allow_paths(self, _allowed_paths: &BTreeSet<PathBuf>) -> Self {
-        self
+    fn with_allow_paths(self, allow_paths: &BTreeSet<PathBuf>) -> Self {
+        Self {
+            resolc_settings: ResolcCliSettings {
+                allow_paths: allow_paths.clone(),
+                ..self.resolc_settings
+            },
+            ..self
+        }
     }
 
-    fn with_include_paths(self, _include_paths: &BTreeSet<PathBuf>) -> Self {
-        self
+    fn with_include_paths(self, include_paths: &BTreeSet<PathBuf>) -> Self {
+        Self {
+            resolc_settings: ResolcCliSettings {
+                include_paths: include_paths.clone(),
+                ..self.resolc_settings
+            },
+            ..self
+        }
     }
 }
 
@@ -108,7 +135,9 @@ impl ResolcSettings {
     pub fn new(
         optimizer: ResolcOptimizer,
         output_selection: HashMap<String, HashMap<String, Vec<String>>>,
+        resolc_settings: ResolcCliSettings,
+        remappings: Vec<Remapping>,
     ) -> Self {
-        Self { optimizer, outputselection: output_selection }
+        Self { optimizer, outputselection: output_selection, resolc_settings, remappings }
     }
 }
