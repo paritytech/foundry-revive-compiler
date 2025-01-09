@@ -526,7 +526,7 @@ impl Resolc {
     pub fn get_version_for_path(path: &Path) -> Result<Version> {
         let mut cmd = Command::new(path);
         cmd.arg("--version").stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
-        debug!(?cmd, "getting Resolc version");
+        debug!("Getting Resolc version");
         let output = cmd.output().map_err(map_io_err(path))?;
         trace!(?output);
         let version = version_from_output(output)?;
@@ -592,17 +592,17 @@ impl Resolc {
         cmd.stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
 
         trace!(input=%serde_json::to_string(input).unwrap_or_else(|e| e.to_string()));
-        debug!(?cmd, "compiling");
+        debug!("Compiling with standard json");
 
         let mut child = cmd.spawn().map_err(map_io_err(&self.resolc))?;
-        debug!("spawned");
+        debug!("Spawned");
 
         let stdin = child.stdin.as_mut().unwrap();
         serde_json::to_writer(stdin, input)?;
-        debug!("wrote JSON input to stdin");
+        debug!("Wrote JSON input to stdin");
 
         let output = child.wait_with_output().map_err(map_io_err(&self.resolc))?;
-        debug!(%output.status, output.stderr = ?String::from_utf8_lossy(&output.stderr), "finished");
+        debug!("Finished compiling with standard json with status {:?}",output.status);
 
         compile_output(output)
     }
