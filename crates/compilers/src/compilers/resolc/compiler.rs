@@ -1,12 +1,12 @@
+use crate::compilers::VersionReq;
 use crate::{
     error::{Result, SolcError},
     resolver::parse::SolData,
     Compiler, CompilerVersion,
 };
-use crate::compilers::VersionReq;
-use once_cell::sync::Lazy;
 use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Error, Remapping, SolcLanguage};
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
@@ -22,13 +22,7 @@ use std::{
     io::Write,
 };
 use which;
-// `--base-path` was introduced in 0.6.9 <https://github.com/ethereum/solidity/releases/tag/v0.6.9>
-pub static SUPPORTS_BASE_PATH: Lazy<VersionReq> =
-    Lazy::new(|| VersionReq::parse(">=0.6.9").unwrap());
 
-// `--include-path` was introduced in 0.8.8 <https://github.com/ethereum/solidity/releases/tag/v0.8.8>
-pub static SUPPORTS_INCLUDE_PATH: Lazy<VersionReq> =
-    Lazy::new(|| VersionReq::parse(">=0.8.8").unwrap());
 #[cfg(target_family = "unix")]
 #[cfg(feature = "async")]
 use super::{ResolcInput, ResolcSettings, ResolcVersionedInput};
@@ -51,7 +45,7 @@ pub struct ResolcCliSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_path: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub include_paths: BTreeSet<PathBuf>
+    pub include_paths: BTreeSet<PathBuf>,
 }
 #[derive(Debug, Deserialize)]
 struct SolcBuilds {
@@ -276,11 +270,11 @@ impl Resolc {
             let new_path = std::env::join_paths(paths)
                 .map_err(|e| SolcError::msg(format!("Failed to join paths: {}", e)))?;
             std::env::set_var("PATH", new_path);
-            println!("Added {} to PATH", dir.display());
+            trace!("Added {} to PATH", dir.display());
         }
 
         std::env::set_var("SOLC_PATH", dir);
-        println!("Set SOLC_PATH to {}", dir.display());
+        trace!("Set SOLC_PATH to {}", dir.display());
 
         Ok(())
     }
@@ -337,7 +331,7 @@ impl Resolc {
                 .map_err(|e| SolcError::msg(format!("Failed to get response text: {}", e)))?;
 
             let builds: SolcBuilds = serde_json::from_str(&text).map_err(|e| {
-                println!("Failed to parse response: {}", text);
+                trace!("Failed to parse response: {}", text);
                 SolcError::msg(format!("Failed to parse solc builds ({}): {}", e, text))
             })?;
 
@@ -568,23 +562,16 @@ impl Resolc {
             cmd.arg("--allow-paths");
             cmd.arg(self.allow_paths.iter().map(|p| p.display()).join(","));
         }
-
         if let Some(base_path) = &self.base_path {
-            if SUPPORTS_BASE_PATH.matches(&self.solc_version_info.version) {
-                if SUPPORTS_INCLUDE_PATH.matches(&self.solc_version_info.version) {
-                    // `--base-path` and `--include-path` conflict if set to the same path, so
-                    // as a precaution, we ensure here that the `--base-path` is not also used
-                    // for `--include-path`
-                    for path in
-                        self.include_paths.iter().filter(|p| p.as_path() != base_path.as_path())
-                    {
-                        cmd.arg("--include-path").arg(path);
-                    }
-                }
-
-                cmd.arg("--base-path").arg(base_path);
+            // `--base-path` and `--include-path` conflict if set to the same path, so
+            // as a precaution, we ensure here that the `--base-path` is not also used
+            // for `--include-path` even though this is also done in revive we want do it
+            // here as well
+            for path in self.include_paths.iter().filter(|p| p.as_path() != base_path.as_path()) {
+                cmd.arg("--include-path").arg(path);
             }
 
+            cmd.arg("--base-path").arg(base_path);
             cmd.current_dir(base_path);
         }
 
@@ -602,7 +589,7 @@ impl Resolc {
         debug!("Wrote JSON input to stdin");
 
         let output = child.wait_with_output().map_err(map_io_err(&self.resolc))?;
-        debug!("Finished compiling with standard json with status {:?}",output.status);
+        debug!("Finished compiling with standard json with status {:?}", output.status);
 
         compile_output(output)
     }
@@ -675,10 +662,10 @@ fn compiler_blocking_install(
 fn try_lock_file(lock_path: PathBuf) -> Result<LockFile> {
     use fs4::FileExt;
 
-    println!("Attempting to create lock file at: {:?}", lock_path);
+    trace!("Attempting to create lock file at: {:?}", lock_path);
     if let Some(parent) = lock_path.parent() {
         if !parent.exists() {
-            println!("Parent directory does not exist: {:?}", parent);
+            trace!("Parent directory does not exist: {:?}", parent);
             std::fs::create_dir_all(parent)
                 .map_err(|e| SolcError::msg(format!("Failed to create parent directory: {}", e)))?;
         }
@@ -802,7 +789,7 @@ mod tests {
                 let installed_path = match Resolc::blocking_install(&expected_version) {
                     Ok(path) => path,
                     Err(e) => {
-                        println!("Skipping test - installation failed: {}", e);
+                        trace!("Skipping test - installation failed: {}", e);
                         return;
                     }
                 };
@@ -826,7 +813,7 @@ mod tests {
                         );
                     }
                     Err(e) => {
-                        println!("Skipping version verification - could not get version: {}", e);
+                        trace!("Skipping version verification - could not get version: {}", e);
                         return;
                     }
                 }
@@ -847,7 +834,7 @@ mod tests {
                 }
             }
             _ => {
-                println!("Skipping test on non-Linux platform");
+                trace!("Skipping test on non-Linux platform");
                 return;
             }
         }
@@ -891,7 +878,7 @@ mod tests {
                     assert_eq!(path_opt.unwrap(), path);
                 }
                 Err(e) => {
-                    println!("Warning: Failed to install version {}: {}", version, e);
+                    trace!("Warning: Failed to install version {}: {}", version, e);
                     continue;
                 }
             }
@@ -904,12 +891,12 @@ mod tests {
         let version = Version::parse("0.1.0-dev.6").unwrap();
         match Resolc::blocking_install(&version) {
             Ok(path) => {
-                println!("version: {:?}", version);
+                trace!("version: {:?}", version);
                 assert!(path.exists(), "Path should exist for version {}", version);
                 assert!(path.is_file(), "Should be a file for version {}", version);
             }
             Err(e) => {
-                println!("Warning: Failed to install version {}: {}", version, e);
+                trace!("Warning: Failed to install version {}: {}", version, e);
             }
         }
     }
@@ -1062,7 +1049,7 @@ mod tests {
             let label = format!("resolc-{version}");
 
             let result = compiler_blocking_install(compiler_path, lock_path, &url, &label);
-            println!("result: {:?}", result);
+            trace!("result: {:?}", result);
             assert!(!result.is_err());
         }
 
@@ -1165,17 +1152,24 @@ mod tests {
     }
     #[test]
     fn test_resolc_installation_and_compilation() {
-        // Here we just testing a somewhat similar pipeline to what foundry uses when it calls Resolc
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .with_file(true)
+            .with_line_number(true)
+            .with_thread_ids(true)
+            .try_init();
+
         let version = Version::parse("0.1.0-dev.6").unwrap();
         let installed_path = Resolc::find_installed_version(&version).unwrap();
 
         let resolc_path = if let Some(path) = installed_path {
-            println!("Found existing installation at: {:?}", path);
+            trace!("Found existing installation at: {:?}", path);
             path
         } else {
             #[cfg(feature = "async")]
             {
-                println!("Installing revive version {}", version);
+                trace!("Installing revive version {}", version);
                 let installed_path =
                     Resolc::blocking_install(&version).expect("Failed to install revive");
 
@@ -1197,8 +1191,35 @@ mod tests {
             }
         };
 
+        // Let Resolc::new handle PATH setup
         let resolc = Resolc::new(resolc_path.clone())
             .expect("Should create Resolc instance from installed binary");
+        let solc_dir = std::path::PathBuf::from("/root/.solc");
+        if let Ok(entries) = std::fs::read_dir(&solc_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    if let Some(file_name) = entry.file_name().to_str() {
+                        if file_name.starts_with("solc-linux") {
+                            let solc_path = entry.path();
+                            let solc_symlink = solc_dir.join("solc");
+                            if !solc_symlink.exists() {
+                                let _ = std::os::unix::fs::symlink(&solc_path, &solc_symlink);
+                                trace!(
+                                    "Created symlink from {:?} to {:?}",
+                                    solc_path,
+                                    solc_symlink
+                                );
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        // Add debug logging to see current PATH after Resolc::new
+        if let Ok(path) = std::env::var("PATH") {
+            trace!("PATH after Resolc::new: {}", path);
+        }
 
         let input = include_str!("../../../../../test-data/resolc/input/compile-input.json");
         let input: ResolcInput = serde_json::from_str(input).expect("Should parse test input JSON");
@@ -1210,7 +1231,7 @@ mod tests {
                 assert!(!output.has_error(), "Compilation should not have errors");
             }
             Err(e) => {
-                println!("Error compiling: {:?}", e);
+                trace!("Error compiling: {:?}", e);
             }
         }
 

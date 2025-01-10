@@ -1,3 +1,8 @@
+use crate::{
+    artifacts::{serde_helpers, EvmVersion, Libraries},
+    compilers::{restrictions::CompilerSettingsRestrictions, CompilerSettings},
+    solc, OutputSelection,
+};
 use alloy_primitives::map::HashMap;
 use foundry_compilers_artifacts::Remapping;
 use serde::{Deserialize, Serialize};
@@ -5,8 +10,6 @@ use std::{
     collections::BTreeSet,
     path::{Path, PathBuf},
 };
-
-use crate::{CompilerSettings, CompilerSettingsRestrictions};
 
 use super::compiler::ResolcCliSettings;
 
@@ -30,6 +33,12 @@ pub struct ResolcSettings {
     pub remappings: Vec<Remapping>,
     #[serde(skip)]
     pub resolc_settings: ResolcCliSettings,
+    #[serde(
+        default,
+        with = "serde_helpers::display_from_str_opt",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub evm_version: Option<EvmVersion>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Copy)]
@@ -61,8 +70,11 @@ impl CompilerSettings for ResolcSettings {
         &mut self,
         f: impl FnOnce(&mut foundry_compilers_artifacts::output_selection::OutputSelection) + Copy,
     ) {
+        // Here we will just include all output selection types
+        // In the future we could include the neccesary i.e. default to reduce
+        // The size of the output file
         let mut output_selection =
-            foundry_compilers_artifacts::output_selection::OutputSelection::default();
+            foundry_compilers_artifacts::output_selection::OutputSelection::complete_output_selection();
         f(&mut output_selection);
 
         let mut selection = HashMap::default();
@@ -89,10 +101,7 @@ impl CompilerSettings for ResolcSettings {
     }
 
     fn with_remappings(self, remappings: &[Remapping]) -> Self {
-        Self {
-            remappings: remappings.to_vec(),
-            ..self
-        }
+        Self { remappings: remappings.to_vec(), ..self }
     }
 
     fn with_base_path(self, base_path: &Path) -> Self {
@@ -137,7 +146,14 @@ impl ResolcSettings {
         output_selection: HashMap<String, HashMap<String, Vec<String>>>,
         resolc_settings: ResolcCliSettings,
         remappings: Vec<Remapping>,
+        evm_version: Option<EvmVersion>,
     ) -> Self {
-        Self { optimizer, outputselection: output_selection, resolc_settings, remappings }
+        Self {
+            optimizer,
+            outputselection: output_selection,
+            resolc_settings,
+            remappings,
+            evm_version,
+        }
     }
 }
