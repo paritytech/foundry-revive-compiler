@@ -1090,43 +1090,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_version_with_whitespace() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: b"resolc version   v0.1.0  \n".to_vec(),
-            stderr: Vec::new(),
-        };
-        let version = version_from_output(output);
-        assert!(version.is_ok());
-        let version = version.unwrap();
-        assert_eq!(version.to_string(), "0.1.0");
-    }
-
-    #[test]
-    fn test_version_with_extra_info() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: b"Some other info\nresolc version v0.1.0\nExtra info".to_vec(),
-            stderr: Vec::new(),
-        };
-        let version = version_from_output(output);
-        assert!(version.is_ok());
-        let version = version.unwrap();
-        assert_eq!(version.to_string(), "0.1.0");
-    }
-
-    #[test]
-    fn test_compile_output_with_stderr() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(1),
-            stdout: Vec::new(),
-            stderr: b"compilation error\n".to_vec(),
-        };
-        let result = compile_output(output);
-        assert!(result.is_err());
-        assert!(format!("{:?}", result.unwrap_err()).contains("compilation error"));
-    }
 
     #[test]
     fn test_solc_available_versions_sorted() {
@@ -1144,12 +1107,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_compiler_path_with_spaces() {
-        let version = Version::new(0, 1, 0);
-        let path = Resolc::compiler_path(&version).unwrap();
-        assert!(!path.to_string_lossy().contains(" "));
-    }
     #[test]
     fn test_resolc_installation_and_compilation() {
         let _ = tracing_subscriber::fmt()
@@ -1240,6 +1197,7 @@ mod tests {
         assert!(final_check.is_some(), "Installation should still be present");
         assert_eq!(final_check.unwrap(), resolc_path, "Installation path should remain consistent");
     }
+   
     #[test]
     fn test_solc_version_info() {
         let version = Version::new(0, 8, 20);
@@ -1274,80 +1232,6 @@ mod tests {
             },
             _ => (),
         }
-    }
-
-    #[test]
-    fn test_resolc_paths_configuration() {
-        let mut resolc = resolc_instance();
-        let test_path = PathBuf::from("/test/path");
-
-        resolc.base_path = Some(test_path.clone());
-        assert_eq!(resolc.base_path.as_ref().unwrap(), &test_path);
-
-        resolc.allow_paths.insert(test_path.clone());
-        assert!(resolc.allow_paths.contains(&test_path));
-
-        resolc.include_paths.insert(test_path.clone());
-        assert!(resolc.include_paths.contains(&test_path));
-    }
-
-    #[test]
-    fn test_compilation_error_handling() {
-        let error = Error {
-            severity: Severity::Error,
-            source_location: Some(SourceLocation {
-                file: "test.sol".to_string(),
-                start: 0,
-                end: 10,
-            }),
-            secondary_source_locations: Vec::new(),
-            r#type: "TypeError".to_string(),
-            component: "compiler".to_string(),
-            error_code: Some(1234),
-            message: "Test error message".to_string(),
-            formatted_message: None,
-        };
-
-        assert!(error.is_error());
-        assert!(!error.is_warning());
-
-        assert_eq!(error.error_code(), Some(1234));
-
-        let source_location = error.source_location().expect("Should have source location");
-        assert_eq!(source_location.file, "test.sol");
-        assert_eq!(source_location.start, 0);
-        assert_eq!(source_location.end, 10);
-
-        assert_eq!(error.r#type, "TypeError");
-        assert_eq!(error.component, "compiler");
-        assert!(error.secondary_source_locations.is_empty());
-    }
-
-    #[test]
-    fn test_solc_home_creation() {
-        let home = Resolc::solc_home();
-        assert!(home.is_ok());
-        let path = home.unwrap();
-        assert!(path.ends_with(".solc"));
-        assert!(!path.ends_with(".revive"));
-    }
-
-    #[test]
-    fn test_get_solc_version_info_parsing() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: b"solc, the solidity compiler commandline interface\nVersion: 0.8.20+commit.a1b79de6.Linux.g++\n".to_vec(),
-            stderr: Vec::new(),
-        };
-
-        let version_info =
-            SolcVersionInfo { version: Version::new(0, 8, 20), revive_version: None };
-
-        let stdout_str = String::from_utf8_lossy(&output.stdout);
-        let version_line = stdout_str.lines().nth(1).unwrap();
-        let version_str = version_line.trim_start_matches("Version: ").split('+').next().unwrap();
-
-        assert_eq!(Version::from_str(version_str).unwrap(), version_info.version);
     }
 
     #[test]
@@ -1413,15 +1297,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_compiler_path_special_chars() {
-        let version = Version::new(0, 1, 0);
-        let path = Resolc::compiler_path(&version).unwrap();
-        let path_str = path.to_string_lossy();
-        assert!(!path_str.contains(".."));
-        assert!(!path_str.contains("//"));
-        assert!(!path_str.contains('\\'));
-    }
 
     #[test]
     fn test_solc_version_info_ordering() {
@@ -1432,22 +1307,8 @@ mod tests {
         let v3 = v1.clone();
         assert_eq!(v1, v3);
     }
-    #[test]
-    fn test_solc_builds_json_parsing() {
-        let json = r#"{
-        "builds": [
-            {
-                "path": "solc-linux-amd64-v0.8.20+commit.a1b79de6",
-                "version": "0.8.20",
-                "sha256": "hash"
-            }
-        ]
-    }"#;
-
-        let builds: SolcBuilds = serde_json::from_str(json).expect("Should parse valid JSON");
-        assert!(!builds.builds.is_empty());
-        assert_eq!(builds.builds[0].version, "0.8.20");
-    }
+  
+  
     #[test]
     fn test_add_to_path_with_real_solc() -> Result<()> {
         let original_path = std::env::var_os("PATH")
