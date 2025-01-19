@@ -563,10 +563,6 @@ impl Resolc {
             cmd.arg(self.allow_paths.iter().map(|p| p.display()).join(","));
         }
         if let Some(base_path) = &self.base_path {
-            // `--base-path` and `--include-path` conflict if set to the same path, so
-            // as a precaution, we ensure here that the `--base-path` is not also used
-            // for `--include-path` even though this is also done in revive we want do it
-            // here as well
             for path in self.include_paths.iter().filter(|p| p.as_path() != base_path.as_path()) {
                 cmd.arg("--include-path").arg(path);
             }
@@ -1090,7 +1086,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_solc_available_versions_sorted() {
         let versions = Resolc::solc_available_versions();
@@ -1197,7 +1192,7 @@ mod tests {
         assert!(final_check.is_some(), "Installation should still be present");
         assert_eq!(final_check.unwrap(), resolc_path, "Installation path should remain consistent");
     }
-   
+
     #[test]
     fn test_solc_version_info() {
         let version = Version::new(0, 8, 20);
@@ -1297,7 +1292,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-
     #[test]
     fn test_solc_version_info_ordering() {
         let v1 = SolcVersionInfo { version: Version::new(0, 8, 20), revive_version: None };
@@ -1307,8 +1301,7 @@ mod tests {
         let v3 = v1.clone();
         assert_eq!(v1, v3);
     }
-  
-  
+
     #[test]
     fn test_add_to_path_with_real_solc() -> Result<()> {
         let original_path = std::env::var_os("PATH")

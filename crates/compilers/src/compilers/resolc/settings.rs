@@ -31,6 +31,8 @@ pub struct ResolcSettings {
     pub outputselection: HashMap<String, HashMap<String, Vec<String>>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remappings: Vec<Remapping>,
+    #[serde(default)]
+    pub libraries: Libraries,
     #[serde(skip)]
     pub resolc_settings: ResolcCliSettings,
     #[serde(
@@ -147,6 +149,7 @@ impl ResolcSettings {
         resolc_settings: ResolcCliSettings,
         remappings: Vec<Remapping>,
         evm_version: Option<EvmVersion>,
+        libraries: Libraries,
     ) -> Self {
         Self {
             optimizer,
@@ -154,6 +157,18 @@ impl ResolcSettings {
             resolc_settings,
             remappings,
             evm_version,
+            libraries,
         }
+    }
+    pub fn strip_prefix(&mut self, base: impl AsRef<Path>) {
+        let base = base.as_ref();
+        self.remappings.iter_mut().for_each(|r| {
+            r.strip_prefix(base);
+        });
+
+        self.libraries.libs = std::mem::take(&mut self.libraries.libs)
+            .into_iter()
+            .map(|(file, libs)| (file.strip_prefix(base).map(Into::into).unwrap_or(file), libs))
+            .collect();
     }
 }

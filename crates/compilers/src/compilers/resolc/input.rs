@@ -66,23 +66,21 @@ impl CompilerInput for ResolcVersionedInput {
     }
 
     fn strip_prefix(&mut self, base: &Path) {
-        let mut new_sources = BTreeMap::new();
-
-        for (path, source) in self.input.sources.0.iter() {
-            let final_path = if let Ok(stripped) = path.strip_prefix(base) {
-                stripped.to_path_buf()
-            } else {
-                path.clone()
-            };
-
-            new_sources.insert(final_path, source.clone());
-        }
-        self.input.sources = Sources(new_sources);
+        self.input.strip_prefix(base);
     }
 }
 
 impl ResolcInput {
     fn new(language: SolcLanguage, sources: Sources, settings: ResolcSettings) -> Self {
         Self { language, sources, settings }
+    }
+    pub fn strip_prefix(&mut self, base: impl AsRef<Path>) {
+        let base = base.as_ref();
+        self.sources = std::mem::take(&mut self.sources)
+            .into_iter()
+            .map(|(path, s)| (path.strip_prefix(base).map(Into::into).unwrap_or(path), s))
+            .collect();
+
+        self.settings.strip_prefix(base);
     }
 }
