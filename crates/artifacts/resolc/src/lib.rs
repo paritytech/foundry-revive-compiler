@@ -73,27 +73,35 @@ pub struct ResolcEVM {
     /// The deployed bytecode of the contract.
     /// It is overwritten with the PolkaVM blob before yielding the compiled project artifacts.
     /// Hence it will be the same as the runtime code but we keep both for compatibility reasons.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "deployedBytecode",
+        alias = "deployed_bytecode",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub deployed_bytecode: Option<DeployedBytecode>,
     /// The contract function signatures.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub method_identifiers: Option<BTreeMap<String, String>>,
     /// The extra EVMLA metadata.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "extraMetadata",
+        alias = "extra_metadata",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub extra_metadata: Option<ExtraMetadata>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EVM {
-    /// The contract EraVM assembly code.
+    /// The contract EVM assembly code.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assembly: Option<String>,
     /// The contract EVM legacy assembly code.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub legacy_assembly: Option<serde_json::Value>,
     /// The contract bytecode.
-    /// Is reset by that of EraVM before yielding the compiled project artifacts.
+    /// Is reset by that of EVM before yielding the compiled project artifacts.
     pub bytecode: Option<Bytecode>,
     /// The list of function hashes
     #[serde(default, skip_serializing_if = "::std::collections::BTreeMap::is_empty")]

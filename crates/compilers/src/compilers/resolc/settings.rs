@@ -1,7 +1,6 @@
 use crate::{
     artifacts::{serde_helpers, EvmVersion, Libraries},
     compilers::{restrictions::CompilerSettingsRestrictions, CompilerSettings},
-    solc, OutputSelection,
 };
 use alloy_primitives::map::HashMap;
 use foundry_compilers_artifacts::Remapping;

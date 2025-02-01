@@ -30,7 +30,6 @@ md-5.workspace = true
 yansi.workspace = true
 futures-util = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
-revive-solidity.workspace = true
 walkdir = "2.4"
 
 [target.'cfg(windows)'.dependencies]

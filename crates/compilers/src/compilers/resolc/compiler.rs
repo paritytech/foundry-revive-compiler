@@ -1,12 +1,10 @@
-use crate::compilers::VersionReq;
 use crate::{
     error::{Result, SolcError},
     resolver::parse::SolData,
     Compiler, CompilerVersion,
 };
-use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Error, Remapping, SolcLanguage};
+use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Error, SolcLanguage};
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
@@ -738,12 +736,10 @@ fn compile_output(output: Output) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{compilers::SourceLocation, CompilationError};
 
     use super::*;
-    use foundry_compilers_artifacts::Severity;
     use semver::Version;
-    use std::{ffi::OsStr, os::unix::process::ExitStatusExt};
+    use std::os::unix::process::ExitStatusExt;
     use tempfile::tempdir;
 
     #[derive(Debug, Deserialize)]
@@ -752,10 +748,7 @@ mod tests {
     }
 
     fn resolc_instance() -> Resolc {
-        Resolc::new(PathBuf::from(
-            revive_solidity::SolcCompiler::DEFAULT_EXECUTABLE_NAME.to_owned(),
-        ))
-        .unwrap()
+        Resolc::new(PathBuf::from("solc".to_owned())).unwrap()
     }
 
     #[test]
@@ -1112,7 +1105,7 @@ mod tests {
             .with_thread_ids(true)
             .try_init();
 
-        let version = Version::parse("0.1.0-dev.6").unwrap();
+        let version = Version::parse("0.1.0-dev.9").unwrap();
         let installed_path = Resolc::find_installed_version(&version).unwrap();
 
         let resolc_path = if let Some(path) = installed_path {
@@ -1175,9 +1168,7 @@ mod tests {
 
         let input = include_str!("../../../../../test-data/resolc/input/compile-input.json");
         let input: ResolcInput = serde_json::from_str(input).expect("Should parse test input JSON");
-
         let compilation_result = resolc.compile(&input);
-
         match compilation_result {
             Ok(output) => {
                 assert!(!output.has_error(), "Compilation should not have errors");
@@ -1186,7 +1177,6 @@ mod tests {
                 trace!("Error compiling: {:?}", e);
             }
         }
-
         let final_check =
             Resolc::find_installed_version(&version).expect("Should find installed version");
         assert!(final_check.is_some(), "Installation should still be present");

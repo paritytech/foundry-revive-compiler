@@ -1,15 +1,9 @@
-use alloy_primitives::map::HashMap;
+use super::ResolcSettings;
+use crate::CompilerInput;
 use foundry_compilers_artifacts::{SolcLanguage, Source, Sources};
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
-
-use crate::CompilerInput;
-
-use super::ResolcSettings;
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResolcVersionedInput {

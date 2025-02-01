@@ -1,3 +1,19 @@
+use crate::{
+    error::Result, resolc::contracts::VersionedContracts, sources::VersionedSourceFiles,
+    ArtifactFile, ArtifactOutput, Artifacts, ArtifactsMap, OutputContext, ProjectPathsConfig,
+};
+use alloy_json_abi::JsonAbi;
+use alloy_primitives::{hex, Bytes};
+use foundry_compilers_artifacts::{
+    resolc::{contract::ResolcContract, ResolcEVM},
+    BytecodeObject, CompactBytecode, CompactContract, CompactContractBytecode,
+    CompactContractBytecodeCow, CompactDeployedBytecode, DevDoc, SolcLanguage, SourceFile,
+    StorageLayout, UserDoc,
+};
+use foundry_compilers_core::error::SolcIoError;
+use path_slash::PathBufExt;
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashSet},
@@ -5,58 +21,100 @@ use std::{
     path::Path,
 };
 
-use alloy_json_abi::JsonAbi;
-use alloy_primitives::{hex, Bytes};
-use foundry_compilers_artifacts::{
-    resolc::contract::ResolcContract, BytecodeObject, CompactBytecode, CompactContract,
-    CompactContractBytecode, CompactContractBytecodeCow, CompactDeployedBytecode, DevDoc,
-    SolcLanguage, SourceFile, StorageLayout, UserDoc,
-};
-use foundry_compilers_core::error::SolcIoError;
-use path_slash::PathBufExt;
-use revive_solidity::SolcStandardJsonOutputContractEVM;
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    error::Result, resolc::contracts::VersionedContracts, sources::VersionedSourceFiles,
-    ArtifactFile, ArtifactOutput, Artifacts, ArtifactsMap, OutputContext, ProjectPathsConfig,
-};
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct ResolcArtifactOutput();
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct ContractArtifact {
-    /// The contract ABI.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub abi: Option<JsonAbi>,
-    /// The contract metadata.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<serde_json::Value>,
-    /// The contract developer documentation.
+    pub metadata: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub devdoc: Option<DevDoc>,
-    /// The contract user documentation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub userdoc: Option<UserDoc>,
-    /// The contract storage layout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage_layout: Option<StorageLayout>,
-    /// Contract's bytecode and related objects
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evm: Option<SolcStandardJsonOutputContractEVM>,
-    /// The contract optimized IR code.
+    pub evm: Option<ResolcEVM>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ir_optimized: Option<String>,
-    /// The contract PolkaVM bytecode hash.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
-    /// The contract factory dependencies.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factory_dependencies: Option<BTreeMap<String, String>>,
-    /// The contract missing libraries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub missing_libraries: Option<HashSet<String>>,
+}
+
+impl<'de> Deserialize<'de> for ContractArtifact {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ContractFields {
+            #[serde(default)]
+            abi: Option<JsonAbi>,
+            #[serde(default)]
+            metadata: Option<Value>,
+            #[serde(default)]
+            devdoc: Option<DevDoc>,
+            #[serde(default)]
+            userdoc: Option<UserDoc>,
+            #[serde(default)]
+            storage_layout: Option<StorageLayout>,
+            #[serde(default)]
+            evm: Option<ResolcEVM>,
+            #[serde(default)]
+            ir_optimized: Option<String>,
+            #[serde(default)]
+            hash: Option<String>,
+            #[serde(default)]
+            factory_dependencies: Option<BTreeMap<String, String>>,
+            #[serde(default)]
+            missing_libraries: Option<HashSet<String>>,
+        }
+
+        let fields = ContractFields::deserialize(deserializer)?;
+
+        fn extract_from_metadata<T: DeserializeOwned>(
+            metadata: &Option<Value>,
+            field: &str,
+        ) -> Option<T> {
+            metadata.as_ref().and_then(|metadata| {
+                if let Value::String(s) = metadata {
+                    serde_json::from_str(s).ok().and_then(|md: Value| {
+                        md.as_object()?
+                            .get("solc_metadata")?
+                            .get(field)
+                            .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    })
+                } else {
+                    None
+                }
+            })
+        }
+
+        let abi = fields.abi.or_else(|| extract_from_metadata(&fields.metadata, "abi"));
+        let userdoc = fields.userdoc.or_else(|| extract_from_metadata(&fields.metadata, "userdoc"));
+        let devdoc = fields.devdoc.or_else(|| extract_from_metadata(&fields.metadata, "devdoc"));
+
+        Ok(ContractArtifact {
+            abi,
+            metadata: fields.metadata,
+            devdoc,
+            userdoc,
+            storage_layout: fields.storage_layout,
+            evm: fields.evm,
+            ir_optimized: fields.ir_optimized,
+            hash: fields.hash,
+            factory_dependencies: fields.factory_dependencies,
+            missing_libraries: fields.missing_libraries,
+        })
+    }
 }
 
 impl Default for ContractArtifact {
@@ -78,34 +136,46 @@ impl Default for ContractArtifact {
 
 impl<'a> From<&'a ContractArtifact> for CompactContractBytecodeCow<'a> {
     fn from(value: &'a ContractArtifact) -> Self {
-        let (standard_abi, compact_bytecode, compact_deployed_bytecode) = create_byte_code(value);
-
-        Self {
-            abi: Some(Cow::Owned(standard_abi)),
-            bytecode: Some(Cow::Owned(compact_bytecode)),
-            deployed_bytecode: Some(Cow::Owned(compact_deployed_bytecode)),
+        if let Some((standard_abi, compact_bytecode, compact_deployed_bytecode)) =
+            create_compact_bytecode(value)
+        {
+            Self {
+                abi: Some(Cow::Owned(standard_abi)),
+                bytecode: Some(Cow::Owned(compact_bytecode)),
+                deployed_bytecode: Some(Cow::Owned(compact_deployed_bytecode)),
+            }
+        } else {
+            Self { abi: value.abi.clone().map(Cow::Owned), bytecode: None, deployed_bytecode: None }
         }
     }
 }
 
 impl From<ContractArtifact> for CompactContractBytecode {
     fn from(value: ContractArtifact) -> Self {
-        let (standard_abi, compact_bytecode, compact_deployed_bytecode) = create_byte_code(&value);
-        Self {
-            abi: Some(standard_abi),
-            bytecode: Some(compact_bytecode),
-            deployed_bytecode: Some(compact_deployed_bytecode),
+        if let Some((standard_abi, compact_bytecode, compact_deployed_bytecode)) =
+            create_compact_bytecode(&value)
+        {
+            Self {
+                abi: Some(standard_abi),
+                bytecode: Some(compact_bytecode),
+                deployed_bytecode: Some(compact_deployed_bytecode),
+            }
+        } else {
+            Self { abi: value.abi, bytecode: None, deployed_bytecode: None }
         }
     }
 }
 
 impl From<ContractArtifact> for CompactContract {
     fn from(value: ContractArtifact) -> Self {
-        let (standard_abi, compact_bytecode, _) = create_byte_code(&value);
-        Self {
-            bin: Some(compact_bytecode.object.clone()),
-            bin_runtime: Some(compact_bytecode.object),
-            abi: Some(standard_abi),
+        if let Some((standard_abi, compact_bytecode, _)) = create_compact_bytecode(&value) {
+            Self {
+                bin: Some(compact_bytecode.object.clone()),
+                bin_runtime: Some(compact_bytecode.object),
+                abi: Some(standard_abi),
+            }
+        } else {
+            Self { bin: None, bin_runtime: None, abi: value.abi }
         }
     }
 }
@@ -142,22 +212,15 @@ impl ResolcArtifactOutput {
     ) -> ContractArtifact {
         ContractArtifact {
             abi: contract.abi,
-            metadata: serde_json::from_str(
-                &serde_json::to_string(&contract.metadata).unwrap_or_default(),
-            )
-            .unwrap_or_default(),
+            metadata: contract.metadata,
             devdoc: contract.devdoc,
             userdoc: contract.userdoc,
-            storage_layout: serde_json::from_str(
-                &serde_json::to_string(&contract.storage_layout).unwrap_or_default(),
-            )
-            .unwrap_or_default(),
-            evm: serde_json::from_str(&serde_json::to_string(&contract.evm).unwrap_or_default())
-                .unwrap_or_default(),
+            storage_layout: contract.storage_layout,
+            evm: contract.evm,
             ir_optimized: contract.ir_optimized,
             hash: None,
-            factory_dependencies: None,
-            missing_libraries: None,
+            factory_dependencies: contract.factory_dependencies,
+            missing_libraries: contract.missing_libraries,
         }
     }
 
@@ -333,45 +396,40 @@ impl ResolcArtifactOutput {
     }
 }
 
-pub fn revive_abi_to_json_abi(
-    abi: Option<serde_json::Value>,
-) -> Result<Option<JsonAbi>, Box<dyn std::error::Error>> {
-    abi.map_or(Ok(None), |value| {
-        let json_str =
-            serde_json::to_string(&value).map_err(|e| format!("Failed to serialize ABI: {}", e))?;
-        JsonAbi::from_json_str(&json_str)
-            .map(Some)
-            .map_err(|e| format!("Failed to parse ABI: {}", e).into())
-    })
-}
-fn create_byte_code(
+fn create_compact_bytecode(
     parent_contract: &ContractArtifact,
-) -> (JsonAbi, CompactBytecode, CompactDeployedBytecode) {
+) -> Option<(JsonAbi, CompactBytecode, CompactDeployedBytecode)> {
     let standard_abi = parent_contract.abi.clone().unwrap_or_default();
+    let evm = parent_contract.evm.as_ref()?;
+    let deserialized_contract_bytecode = evm.bytecode.as_ref()?.object.as_bytes()?;
+    let deserialized_contract_deployed_bytecode = evm.deployed_bytecode.as_ref()?.bytes()?;
 
-    let binding = parent_contract.evm.clone().unwrap().bytecode.unwrap();
-    let raw_bytecode = binding.object.as_str();
-    let binding = parent_contract.evm.clone().unwrap().deployed_bytecode.unwrap();
-    let raw_deployed_bytecode = binding.object.as_str();
+    let bytecode = match hex::decode(deserialized_contract_bytecode) {
+        Ok(bytes) => BytecodeObject::Bytecode(Bytes::from(bytes)),
+        Err(_) => return None,
+    };
 
-    let bytecode = BytecodeObject::Bytecode(Bytes::from(hex::decode(raw_bytecode).unwrap()));
-    let deployed_bytecode =
-        BytecodeObject::Bytecode(Bytes::from(hex::decode(raw_deployed_bytecode).unwrap()));
+    let deployed_bytecode = match hex::decode(deserialized_contract_deployed_bytecode) {
+        Ok(bytes) => BytecodeObject::Bytecode(Bytes::from(bytes)),
+        Err(_) => return None,
+    };
 
     let compact_bytecode = CompactBytecode {
         object: bytecode,
         source_map: None,
         link_references: BTreeMap::default(),
     };
+
     let compact_bytecode_deployed = CompactBytecode {
         object: deployed_bytecode,
         source_map: None,
         link_references: BTreeMap::default(),
     };
+
     let compact_deployed_bytecode = CompactDeployedBytecode {
         bytecode: Some(compact_bytecode_deployed),
         immutable_references: BTreeMap::default(),
     };
 
-    (standard_abi, compact_bytecode, compact_deployed_bytecode)
+    Some((standard_abi, compact_bytecode, compact_deployed_bytecode))
 }
