@@ -8,6 +8,7 @@ use foundry_compilers::{
         multi::{
             MultiCompiler, MultiCompilerLanguage, MultiCompilerParsedSource, MultiCompilerSettings,
         },
+        resolc::Resolc,
         solc::{Solc, SolcCompiler, SolcLanguage},
         vyper::{Vyper, VyperLanguage, VyperSettings},
         CompilerOutput,
@@ -143,12 +144,67 @@ fn can_compile_hardhat_sample() {
 }
 
 #[test]
+fn can_compile_hardhat_sample_resolc() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/hardhat-sample");
+    let paths = ProjectPathsConfig::builder()
+        .sources(root.join("contracts"))
+        .lib(root.join("node_modules"));
+    let project = TempProject::<Resolc, ConfigurableArtifacts>::new(paths).unwrap();
+
+    let compiled = project.compile().unwrap();
+    assert!(compiled.find_first("Greeter").is_some());
+    assert!(compiled.find_first("console").is_some());
+    compiled.assert_success();
+
+    // nothing to compile
+    let compiled = project.compile().unwrap();
+    assert!(compiled.find_first("Greeter").is_some());
+    assert!(compiled.find_first("console").is_some());
+    assert!(compiled.is_unchanged());
+
+    // delete artifacts
+    std::fs::remove_dir_all(&project.paths().artifacts).unwrap();
+    let compiled = project.compile().unwrap();
+    assert!(compiled.find_first("Greeter").is_some());
+    assert!(compiled.find_first("console").is_some());
+    assert!(!compiled.is_unchanged());
+}
+
+#[test]
 fn can_compile_dapp_sample() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
     let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
     let project = TempProject::<SolcCompiler, ConfigurableArtifacts>::new(paths).unwrap();
 
     let compiled = project.compile().unwrap();
+    assert!(compiled.find_first("Dapp").is_some());
+    compiled.assert_success();
+
+    // nothing to compile
+    let compiled = project.compile().unwrap();
+    assert!(compiled.find_first("Dapp").is_some());
+    assert!(compiled.is_unchanged());
+
+    let cache = CompilerCache::<SolcSettings>::read(project.cache_path()).unwrap();
+
+    // delete artifacts
+    std::fs::remove_dir_all(&project.paths().artifacts).unwrap();
+    let compiled = project.compile().unwrap();
+    assert!(compiled.find_first("Dapp").is_some());
+    assert!(!compiled.is_unchanged());
+
+    let updated_cache = CompilerCache::<SolcSettings>::read(project.cache_path()).unwrap();
+    assert_eq!(cache, updated_cache);
+}
+
+#[test]
+fn can_compile_dapp_sample_resolc() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
+    let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
+    let project = TempProject::<Resolc, ConfigurableArtifacts>::new(paths).unwrap();
+
+    let compiled = project.compile();
+    let compiled = compiled.unwrap();
     assert!(compiled.find_first("Dapp").is_some());
     compiled.assert_success();
 

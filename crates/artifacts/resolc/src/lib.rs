@@ -1,18 +1,15 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
 pub mod contract;
 use contract::ResolcContract;
 use foundry_compilers_artifacts_solc::{
-    Bytecode, DeployedBytecode, Error, FileToContractsMap, SourceFile, SourceFiles,
+    Bytecode, BytecodeObject, DeployedBytecode, Error, FileToContractsMap, SourceFile,
 };
 use serde::{Deserialize, Serialize};
 
-/// This file contains data structures that we need defined locally as some of them need to be used in trait
-/// Implementation in such a way that they are owned so if we use existing structures from Revive
-/// We will run into issues
+/// This file contains data structures that we need defined locally as some of them need to be used
+/// in trait Implementation in such a way that they are owned so if we use existing structures from
+/// Revive We will run into issues
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct ResolcCompilerOutput {
@@ -35,6 +32,7 @@ pub struct ResolcCompilerOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revive_version: Option<String>,
 }
+
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RecursiveFunction {
@@ -69,86 +67,62 @@ pub struct ResolcEVM {
     /// The contract bytecode.
     /// Is reset by that of PolkaVM before yielding the compiled project artifacts.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bytecode: Option<Bytecode>,
+    pub bytecode: Option<ResolcBytecode>,
     /// The deployed bytecode of the contract.
     /// It is overwritten with the PolkaVM blob before yielding the compiled project artifacts.
     /// Hence it will be the same as the runtime code but we keep both for compatibility reasons.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub deployed_bytecode: Option<DeployedBytecode>,
+    pub deployed_bytecode: Option<ResolcBytecode>,
     /// The contract function signatures.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub method_identifiers: Option<BTreeMap<String, String>>,
-    /// The extra EVMLA metadata.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub extra_metadata: Option<ExtraMetadata>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct EVM {
-    /// The contract EraVM assembly code.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub assembly: Option<String>,
-    /// The contract EVM legacy assembly code.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub legacy_assembly: Option<serde_json::Value>,
-    /// The contract bytecode.
-    /// Is reset by that of EraVM before yielding the compiled project artifacts.
-    pub bytecode: Option<Bytecode>,
-    /// The list of function hashes
     #[serde(default, skip_serializing_if = "::std::collections::BTreeMap::is_empty")]
     pub method_identifiers: BTreeMap<String, String>,
     /// The extra EVMLA metadata.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extra_metadata: Option<ExtraMetadata>,
 }
-pub type ResolcContracts = FileToContractsMap<ResolcContract>;
 
-/// A wrapper helper type for the `Contracts` type alias
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct OutputContracts(pub ResolcContracts);
-impl ResolcCompilerOutput {
-    /// Whether the output contains a compiler error
-    pub fn has_error(&self) -> bool {
-        self.errors.iter().any(|err| err.severity.is_error())
-    }
+/// The `solc --standard-json` output contract EVM deployed bytecode.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolcBytecode {
+    /// The bytecode object.
+    pub object: String,
+}
 
-    /// Returns the output's source files and contracts separately, wrapped in helper types that
-    /// provide several helper methods
-    pub fn split(self) -> (SourceFiles, OutputContracts) {
-        (SourceFiles(self.sources), OutputContracts(self.contracts))
-    }
-
-    /// Retains only those files the given iterator yields
-    ///
-    /// In other words, removes all contracts for files not included in the iterator
-    pub fn retain_files<'a, I>(&mut self, files: I)
-    where
-        I: IntoIterator<Item = &'a Path>,
-    {
-        // Note: use `to_lowercase` here because solc not necessarily emits the exact file name,
-        // e.g. `src/utils/upgradeProxy.sol` is emitted as `src/utils/UpgradeProxy.sol`
-        let files: HashSet<_> =
-            files.into_iter().map(|s| s.to_string_lossy().to_lowercase()).collect();
-        self.contracts.retain(|f, _| files.contains(&f.to_string_lossy().to_lowercase()));
-        self.sources.retain(|f, _| files.contains(&f.to_string_lossy().to_lowercase()));
-    }
-
-    pub fn merge(&mut self, other: Self) {
-        self.errors.extend(other.errors);
-        self.contracts.extend(other.contracts);
-        self.sources.extend(other.sources);
-    }
-
-    pub fn join_all(&mut self, root: impl AsRef<Path>) {
-        let root = root.as_ref();
-        self.contracts = std::mem::take(&mut self.contracts)
-            .into_iter()
-            .map(|(path, contracts)| (root.join(path), contracts))
-            .collect();
-        self.sources = std::mem::take(&mut self.sources)
-            .into_iter()
-            .map(|(path, source)| (root.join(path), source))
-            .collect();
+impl ResolcBytecode {
+    /// A shortcut constructor.
+    pub fn new(object: String) -> Self {
+        Self { object }
     }
 }
+
+impl From<ResolcBytecode> for Bytecode {
+    fn from(value: ResolcBytecode) -> Self {
+        Bytecode {
+            function_debug_data: BTreeMap::new(),
+            object: BytecodeObject::Unlinked(value.object),
+            opcodes: None,
+            source_map: None,
+            generated_sources: vec![],
+            link_references: BTreeMap::new(),
+        }
+    }
+}
+
+impl From<ResolcEVM> for foundry_compilers_artifacts_solc::Evm {
+    fn from(evm: ResolcEVM) -> Self {
+        Self {
+            bytecode: evm.bytecode.clone().map(Into::into),
+            deployed_bytecode: Some(DeployedBytecode {
+                bytecode: evm.deployed_bytecode.or(evm.bytecode).map(Into::into),
+                immutable_references: BTreeMap::new(),
+            }),
+            method_identifiers: evm.method_identifiers,
+            assembly: evm.assembly_text,
+            legacy_assembly: evm.assembly,
+            gas_estimates: None,
+        }
+    }
+}
+
+pub type ResolcContracts = FileToContractsMap<ResolcContract>;

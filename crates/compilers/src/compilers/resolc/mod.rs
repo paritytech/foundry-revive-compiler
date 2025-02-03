@@ -1,7 +1,20 @@
 mod compiler;
 mod input;
-mod settings;
-mod term;
-pub use compiler::{Resolc, ResolcCliSettings};
+pub use compiler::Resolc;
+use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, solc::error::Error, Contract};
 pub use input::{ResolcInput, ResolcVersionedInput};
-pub use settings::{ResolcOptimizer, ResolcRestrictions, ResolcSettings};
+
+impl From<ResolcCompilerOutput> for super::CompilerOutput<Error, Contract> {
+    fn from(output: ResolcCompilerOutput) -> Self {
+        Self {
+            errors: output.errors.into(),
+            contracts: output
+                .contracts
+                .into_iter()
+                .map(|(k, v)| (k, v.into_iter().map(|(k, v)| (k, v.into())).collect()))
+                .collect(),
+            sources: output.sources.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            metadata: Default::default(),
+        }
+    }
+}

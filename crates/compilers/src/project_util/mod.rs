@@ -61,10 +61,18 @@ impl<
     /// Explicitly sets the solc version for the project
     #[cfg(feature = "svm-solc")]
     pub fn set_solc(&mut self, solc: &str) -> &mut Self {
-        use crate::solc::{Solc, SolcCompiler};
+        use crate::{
+            resolc::Resolc,
+            solc::{Solc, SolcCompiler},
+        };
 
-        self.inner.compiler.solc =
-            Some(SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap()));
+        self.inner.compiler.solc = Some(
+            Resolc::new(
+                which::which("resolc").unwrap(),
+                SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap()),
+            )
+            .unwrap(),
+        );
 
         self
     }

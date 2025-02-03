@@ -1,16 +1,10 @@
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashSet},
-};
+use std::collections::{BTreeMap, HashSet};
 
 use alloy_json_abi::JsonAbi;
-use foundry_compilers_artifacts_solc::{
-    CompactBytecode, CompactContractBytecode, CompactContractBytecodeCow, CompactContractRef,
-    CompactDeployedBytecode, DevDoc, StorageLayout, UserDoc,
-};
+use foundry_compilers_artifacts_solc::{DevDoc, LosslessMetadata, StorageLayout, UserDoc};
 use serde::{Deserialize, Serialize};
 
-use crate::{ResolcEVM, EVM};
+use crate::ResolcEVM;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ResolcContract {
@@ -31,12 +25,7 @@ pub struct ResolcContract {
     pub storage_layout: Option<StorageLayout>,
     /// Contract's bytecode and related objects
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evm: Option<EVM>,
-    /// Revive related output
-    /// We are going to use  structs defined locally
-    /// as opposed to revive defined
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resolc_evm: Option<ResolcEVM>,
+    pub evm: Option<ResolcEVM>,
     /// The contract optimized IR code.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ir_optimized: Option<String>,
@@ -64,98 +53,36 @@ impl Default for ResolcContract {
             hash: None,
             factory_dependencies: None,
             missing_libraries: None,
-            resolc_evm: None,
         }
     }
 }
-
-impl<'a> From<&'a ResolcContract> for CompactContractBytecodeCow<'a> {
-    fn from(value: &'a ResolcContract) -> Self {
-        if let Some((standard_abi, compact_bytecode, compact_deployed_bytecode)) =
-            create_compact_bytecode(value)
-        {
-            Self {
-                abi: Some(Cow::Owned(standard_abi)),
-                bytecode: Some(Cow::Owned(compact_bytecode)),
-                deployed_bytecode: Some(Cow::Owned(compact_deployed_bytecode)),
-            }
-        } else {
-            Self { abi: None, bytecode: None, deployed_bytecode: None }
-        }
-    }
-}
-
-impl From<ResolcContract> for CompactContractBytecode {
-    fn from(value: ResolcContract) -> Self {
-        if let Some((standard_abi, compact_bytecode, compact_deployed_bytecode)) =
-            create_compact_bytecode(&value)
-        {
-            Self {
-                abi: Some(standard_abi),
-                bytecode: Some(compact_bytecode),
-                deployed_bytecode: Some(compact_deployed_bytecode),
-            }
-        } else {
-            Self { abi: None, bytecode: None, deployed_bytecode: None }
-        }
-    }
-}
-
-impl<'a> From<&'a ResolcContract> for CompactContractRef<'a> {
-    fn from(c: &'a ResolcContract) -> Self {
-        let (bin, bin_runtime) = if let Some(ref evm) = c.resolc_evm {
-            (
-                evm.bytecode.as_ref().map(|code| &code.object),
-                evm.deployed_bytecode
-                    .as_ref()
-                    .and_then(|deployed| deployed.bytecode.as_ref().map(|code| &code.object)),
-            )
-        } else {
-            (None, None)
+impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
+    fn from(contract: ResolcContract) -> Self {
+        let meta = match contract.metadata {
+            Some(meta) => match meta {
+                serde_json::Value::Object(map) => {
+                    if let Some(meta) = map.get("solc_metadata") {
+                        serde_json::from_value::<LosslessMetadata>(meta.clone()).ok()
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            },
+            None => Default::default(),
         };
-
-        Self { abi: c.abi.as_ref(), bin, bin_runtime }
+        Self {
+            abi: contract.abi.or_else(|| Some(JsonAbi::new())),
+            evm: contract.evm.map(Into::into),
+            metadata: meta,
+            userdoc: contract.userdoc.unwrap_or_default(),
+            devdoc: contract.devdoc.unwrap_or_default(),
+            ir: None,
+            storage_layout: contract.storage_layout.unwrap_or_default(),
+            transient_storage_layout: Default::default(),
+            ewasm: None,
+            ir_optimized: contract.ir_optimized,
+            ir_optimized_ast: None,
+        }
     }
-}
-fn create_compact_bytecode(
-    parent_contract: &ResolcContract,
-) -> Option<(JsonAbi, CompactBytecode, CompactDeployedBytecode)> {
-    let Some(resolc_evm) = &parent_contract.resolc_evm else {
-        return None;
-    };
-
-    let Some(bytecode) = &resolc_evm.bytecode else {
-        return None;
-    };
-
-    let Some(deployed) = &resolc_evm.deployed_bytecode else {
-        return None;
-    };
-
-    let Some(deployed_bytecode) = &deployed.bytecode else {
-        return None;
-    };
-
-    let compact_bytecode = CompactBytecode {
-        object: bytecode.object.clone(),
-        source_map: None,
-        link_references: BTreeMap::default(),
-    };
-
-    let compact_bytecode_deployed = CompactBytecode {
-        object: deployed_bytecode.object.clone(),
-        source_map: None,
-        link_references: BTreeMap::default(),
-    };
-
-    let compact_deployed_bytecode = CompactDeployedBytecode {
-        bytecode: Some(compact_bytecode_deployed),
-        immutable_references: BTreeMap::default(),
-    };
-
-    Some((
-        parent_contract.abi.clone().unwrap_or_default(),
-        compact_bytecode,
-        compact_deployed_bytecode,
-    ))
 }

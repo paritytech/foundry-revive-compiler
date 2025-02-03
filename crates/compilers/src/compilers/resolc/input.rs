@@ -1,15 +1,9 @@
-use alloy_primitives::map::HashMap;
 use foundry_compilers_artifacts::{SolcLanguage, Source, Sources};
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::path::Path;
 
-use crate::CompilerInput;
-
-use super::ResolcSettings;
+use crate::{solc::SolcSettings, CompilerInput};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResolcVersionedInput {
@@ -22,7 +16,7 @@ pub struct ResolcVersionedInput {
 pub struct ResolcInput {
     pub language: SolcLanguage,
     pub sources: Sources,
-    pub settings: ResolcSettings,
+    pub settings: SolcSettings,
 }
 
 impl Default for ResolcInput {
@@ -30,13 +24,13 @@ impl Default for ResolcInput {
         Self {
             language: SolcLanguage::Solidity,
             sources: Sources::default(),
-            settings: ResolcSettings::default(),
+            settings: SolcSettings::default(),
         }
     }
 }
 
 impl CompilerInput for ResolcVersionedInput {
-    type Settings = ResolcSettings;
+    type Settings = SolcSettings;
     type Language = SolcLanguage;
 
     fn build(
@@ -71,9 +65,10 @@ impl CompilerInput for ResolcVersionedInput {
 }
 
 impl ResolcInput {
-    fn new(language: SolcLanguage, sources: Sources, settings: ResolcSettings) -> Self {
+    fn new(language: SolcLanguage, sources: Sources, settings: SolcSettings) -> Self {
         Self { language, sources, settings }
     }
+
     pub fn strip_prefix(&mut self, base: impl AsRef<Path>) {
         let base = base.as_ref();
         self.sources = std::mem::take(&mut self.sources)
