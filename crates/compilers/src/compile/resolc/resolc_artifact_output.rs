@@ -85,16 +85,15 @@ impl<'de> Deserialize<'de> for ContractArtifact {
             field: &str,
         ) -> Option<T> {
             metadata.as_ref().and_then(|metadata| {
-                if let Value::String(s) = metadata {
-                    serde_json::from_str(s).ok().and_then(|md: Value| {
-                        md.as_object()?
-                            .get("solc_metadata")?
-                            .get(field)
+                metadata
+                    .get("solc_metadata")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| serde_json::from_str(s).ok())
+                    .and_then(|md: Value| {
+                        md.get("output")
+                            .and_then(|v| v.get(field))
                             .and_then(|v| serde_json::from_value(v.clone()).ok())
                     })
-                } else {
-                    None
-                }
             })
         }
 
