@@ -65,14 +65,11 @@ impl<
             resolc::Resolc,
             solc::{Solc, SolcCompiler},
         };
+        let solc = SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap());
+        self.inner.compiler.solc = Some(solc.clone());
 
-        self.inner.compiler.solc = Some(
-            Resolc::new(
-                which::which("resolc").unwrap(),
-                SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap()),
-            )
-            .unwrap(),
-        );
+        self.inner.compiler.resolc =
+            Some(Resolc::new(which::which("resolc").unwrap(), solc).unwrap());
 
         self
     }

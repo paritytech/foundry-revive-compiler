@@ -57,6 +57,7 @@ pub struct ExtraMetadata {
     pub recursive_functions: Vec<RecursiveFunction>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ResolcEVM {
     /// The contract EVM legacy assembly code.
     #[serde(rename = "legacyAssembly", skip_serializing_if = "Option::is_none")]

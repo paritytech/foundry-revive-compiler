@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::ResolcEVM;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ResolcContract {
     /// The contract ABI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -56,9 +57,21 @@ impl Default for ResolcContract {
         }
     }
 }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+struct Output {
+    devdoc: DevDoc,
+    userdoc: UserDoc,
+    abi: JsonAbi,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+struct Meta {
+    output: Output,
+}
+
 impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
     fn from(contract: ResolcContract) -> Self {
-        let meta = match contract.metadata {
+        let meta = match contract.metadata.as_ref() {
             Some(meta) => match meta {
                 serde_json::Value::Object(map) => {
                     if let Some(meta) = map.get("solc_metadata") {
@@ -71,12 +84,19 @@ impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
             },
             None => Default::default(),
         };
+
+        let Output { abi, devdoc, userdoc } = meta
+            .as_ref()
+            .and_then(|meta| serde_json::from_str::<Meta>(&meta.raw_metadata).ok())
+            .map(|i| i.output)
+            .unwrap_or_default();
+
         Self {
-            abi: contract.abi.or_else(|| Some(JsonAbi::new())),
+            abi: contract.abi.or_else(|| Some(abi)),
             evm: contract.evm.map(Into::into),
             metadata: meta,
-            userdoc: contract.userdoc.unwrap_or_default(),
-            devdoc: contract.devdoc.unwrap_or_default(),
+            userdoc: contract.userdoc.unwrap_or(userdoc),
+            devdoc: contract.devdoc.unwrap_or(devdoc),
             ir: None,
             storage_layout: contract.storage_layout.unwrap_or_default(),
             transient_storage_layout: Default::default(),

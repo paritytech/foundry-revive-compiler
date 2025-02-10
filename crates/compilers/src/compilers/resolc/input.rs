@@ -1,4 +1,5 @@
 use foundry_compilers_artifacts::{SolcLanguage, Source, Sources};
+use foundry_compilers_core::utils::strip_prefix_owned;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -69,11 +70,10 @@ impl ResolcInput {
         Self { language, sources, settings }
     }
 
-    pub fn strip_prefix(&mut self, base: impl AsRef<Path>) {
-        let base = base.as_ref();
+    pub fn strip_prefix(&mut self, base: &Path) {
         self.sources = std::mem::take(&mut self.sources)
             .into_iter()
-            .map(|(path, s)| (path.strip_prefix(base).map(Into::into).unwrap_or(path), s))
+            .map(|(path, s)| (strip_prefix_owned(path, &base), s))
             .collect();
 
         self.settings.strip_prefix(base);

@@ -1,7 +1,7 @@
 use super::{
     resolc::{Resolc, ResolcVersionedInput},
     restrictions::CompilerSettingsRestrictions,
-    solc::{SolcCompiler, SolcSettings, SOLC_EXTENSIONS},
+    solc::{SolcCompiler, SolcSettings, SolcVersionedInput, SOLC_EXTENSIONS},
     vyper::{
         input::VyperVersionedInput, parser::VyperParsedSource, Vyper, VyperLanguage,
         VYPER_EXTENSIONS,
@@ -35,8 +35,10 @@ use std::{
 /// Compiler capable of compiling both Solidity and Vyper sources.
 #[derive(Clone, Debug)]
 pub struct MultiCompiler {
-    pub solc: Option<Resolc>,
+    pub solc: Option<SolcCompiler>,
     pub vyper: Option<Vyper>,
+    pub resolc: Option<Resolc>,
+    pub use_resolc: bool,
 }
 
 impl Default for MultiCompiler {
@@ -51,9 +53,9 @@ impl Default for MultiCompiler {
         let resolc = which::which("resolc")
             .ok()
             .zip(solc.clone())
-            .and_then(|(path, solc)| Resolc::new(path, solc).ok());
+            .and_then(|(path, solc)| Resolc::new(path, solc.clone()).ok());
 
-        Self { solc: resolc, vyper }
+        Self { resolc, vyper, solc, use_resolc: true }
     }
 }
 
@@ -62,13 +64,14 @@ impl MultiCompiler {
         solc: Option<SolcCompiler>,
         vyper_path: Option<PathBuf>,
         resolc_path: Option<PathBuf>,
+        use_resolc: bool,
     ) -> Result<Self> {
         let vyper = vyper_path.map(Vyper::new).transpose()?;
-        let solc = resolc_path
+        let resolc = resolc_path
             .zip(solc.clone())
             .map(|(path, solc)| Resolc::new(path, solc))
             .transpose()?;
-        Ok(Self { solc, vyper })
+        Ok(Self { resolc, solc, vyper, use_resolc })
     }
 }
 
@@ -226,7 +229,7 @@ impl From<MultiCompilerSettings> for VyperSettings {
 #[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 pub enum MultiCompilerInput {
-    Solc(ResolcVersionedInput),
+    Solc(SolcVersionedInput),
     Vyper(VyperVersionedInput),
 }
 
@@ -242,7 +245,7 @@ impl CompilerInput for MultiCompilerInput {
     ) -> Self {
         match language {
             MultiCompilerLanguage::Solc(language) => {
-                Self::Solc(ResolcVersionedInput::build(sources, settings.solc, language, version))
+                Self::Solc(SolcVersionedInput::build(sources, settings.solc, language, version))
             }
             MultiCompilerLanguage::Vyper(language) => {
                 Self::Vyper(VyperVersionedInput::build(sources, settings.vyper, language, version))
@@ -302,12 +305,29 @@ impl Compiler for MultiCompiler {
     ) -> Result<CompilerOutput<Self::CompilationError, Self::CompilerContract>> {
         match input {
             MultiCompilerInput::Solc(input) => {
-                if let Some(resolc) = &self.solc {
-                    Compiler::compile(resolc, input)
-                        .map(|res| res.map_err(MultiCompilerError::Solc))
+                if self.use_resolc {
+                    if let Some(resolc) = &self.resolc {
+                        let input = input.clone();
+                        let input = ResolcVersionedInput::build(
+                            input.input.sources,
+                            SolcSettings {
+                                settings: input.input.settings,
+                                cli_settings: input.cli_settings,
+                            },
+                            input.input.language,
+                            input.version,
+                        );
+                        return Compiler::compile(resolc, &input)
+                            .map(|res| res.map_err(MultiCompilerError::Solc));
+                    }
                 } else {
-                    Err(SolcError::msg("resolc compiler is not available"))
+                    if let Some(solc) = &self.solc {
+                        return Compiler::compile(solc, input)
+                            .map(|res| res.map_err(MultiCompilerError::Solc));
+                    }
                 }
+
+                return Err(SolcError::msg("resolc compiler is not available"));
             }
             MultiCompilerInput::Vyper(input) => {
                 if let Some(vyper) = &self.vyper {

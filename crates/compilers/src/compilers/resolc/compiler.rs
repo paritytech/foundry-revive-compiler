@@ -49,6 +49,7 @@ impl Compiler for Resolc {
         let solc = self.solc(input)?;
         let results = self.compile_output::<ResolcInput>(&solc, &input.input)?;
         let output = std::str::from_utf8(&results).map_err(|_| SolcError::InvalidUtf8)?;
+
         let results: ResolcCompilerOutput =
             serde_json::from_str(output).map_err(|e| SolcError::msg(e.to_string()))?;
         Ok(results.into())
@@ -135,15 +136,17 @@ impl Resolc {
             cmd.arg("--base-path").arg(base_path);
             cmd.current_dir(base_path);
         }
-
+        let mut settings = input.settings.clone();
+        settings.sanitize(&solc.version, input.language);
+        let input =
+            &ResolcInput { settings, sources: input.sources.clone(), language: input.language };
         let child = if matches!(&input.language, SolcLanguage::Solidity) {
             cmd.arg("--solc");
             cmd.arg(&solc.solc);
             cmd.arg("--standard-json");
             let mut child = cmd.spawn().map_err(map_io_err(&self.resolc))?;
-
             let mut stdin = io::BufWriter::new(child.stdin.take().unwrap());
-            serde_json::to_writer(&mut stdin, input)?;
+            serde_json::to_writer(&mut stdin, &input)?;
             stdin.flush().map_err(map_io_err(&self.resolc))?;
             child
         } else {
