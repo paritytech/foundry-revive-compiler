@@ -1,9 +1,8 @@
 use super::{
-    restrictions::CompilerSettingsRestrictions, Compiler, CompilerInput, CompilerOutput,
-    CompilerSettings, CompilerVersion, Language, ParsedSource,
+    restrictions::CompilerSettingsRestrictions, CompilationError, Compiler, CompilerInput,
+    CompilerOutput, CompilerSettings, CompilerVersion, Language, ParsedSource,
 };
 use crate::resolver::parse::SolData;
-use crate::CompilationError;
 pub use foundry_compilers_artifacts::SolcLanguage;
 use foundry_compilers_artifacts::{
     error::SourceLocation,

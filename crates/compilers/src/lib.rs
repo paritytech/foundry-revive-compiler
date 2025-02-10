@@ -15,15 +15,16 @@ pub use artifact_output::*;
 pub mod buildinfo;
 
 pub mod cache;
+
 pub mod flatten;
-pub mod resolc;
+
 pub mod resolver;
 pub use resolver::Graph;
 
 pub mod compilers;
 pub use compilers::*;
 
-pub mod compile;
+mod compile;
 pub use compile::{
     output::{AggregatedCompilerOutput, ProjectCompileOutput},
     *,
