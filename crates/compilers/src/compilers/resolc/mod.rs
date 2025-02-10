@@ -7,13 +7,13 @@ pub use input::{ResolcInput, ResolcVersionedInput};
 impl From<ResolcCompilerOutput> for super::CompilerOutput<Error, Contract> {
     fn from(output: ResolcCompilerOutput) -> Self {
         Self {
-            errors: output.errors.into(),
+            errors: output.errors,
             contracts: output
                 .contracts
                 .into_iter()
                 .map(|(k, v)| (k, v.into_iter().map(|(k, v)| (k, v.into())).collect()))
                 .collect(),
-            sources: output.sources.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            sources: output.sources,
             metadata: Default::default(),
         }
     }

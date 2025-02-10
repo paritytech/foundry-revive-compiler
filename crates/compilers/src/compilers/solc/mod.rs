@@ -243,23 +243,12 @@ impl<V: Ord + Copy> Restriction<V> {
 }
 
 /// Restrictions on settings for the solc compiler.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SolcRestrictions {
     pub evm_version: Restriction<EvmVersion>,
     pub via_ir: Option<bool>,
     pub optimizer_runs: Restriction<usize>,
     pub bytecode_hash: Option<BytecodeHash>,
-}
-
-impl Default for SolcRestrictions {
-    fn default() -> Self {
-        Self {
-            evm_version: Default::default(),
-            via_ir: Default::default(),
-            optimizer_runs: Default::default(),
-            bytecode_hash: Default::default(),
-        }
-    }
 }
 
 impl CompilerSettingsRestrictions for SolcRestrictions {

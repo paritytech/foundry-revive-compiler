@@ -319,7 +319,7 @@ mod tests {
 
         let project = ProjectBuilder::<Resolc>::new(Default::default())
             .settings(Default::default())
-            .build(resolc.clone())
+            .build(resolc)
             .unwrap();
 
         let input = include_str!("../../../../../test-data/resolc/input/compile-input.json");

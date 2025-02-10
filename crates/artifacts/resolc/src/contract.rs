@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ResolcEVM;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolcContract {
     /// The contract ABI.
@@ -41,22 +41,6 @@ pub struct ResolcContract {
     pub missing_libraries: Option<HashSet<String>>,
 }
 
-impl Default for ResolcContract {
-    fn default() -> Self {
-        Self {
-            abi: None,
-            metadata: None,
-            devdoc: None,
-            userdoc: None,
-            storage_layout: None,
-            evm: None,
-            ir_optimized: None,
-            hash: None,
-            factory_dependencies: None,
-            missing_libraries: None,
-        }
-    }
-}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 struct Output {
     devdoc: DevDoc,
@@ -92,7 +76,7 @@ impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
             .unwrap_or_default();
 
         Self {
-            abi: contract.abi.or_else(|| Some(abi)),
+            abi: contract.abi.or(Some(abi)),
             evm: contract.evm.map(Into::into),
             metadata: meta,
             userdoc: contract.userdoc.unwrap_or(userdoc),

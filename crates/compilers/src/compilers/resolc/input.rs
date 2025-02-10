@@ -73,7 +73,7 @@ impl ResolcInput {
     pub fn strip_prefix(&mut self, base: &Path) {
         self.sources = std::mem::take(&mut self.sources)
             .into_iter()
-            .map(|(path, s)| (strip_prefix_owned(path, &base), s))
+            .map(|(path, s)| (strip_prefix_owned(path, base), s))
             .collect();
 
         self.settings.strip_prefix(base);

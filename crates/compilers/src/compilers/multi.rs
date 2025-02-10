@@ -53,7 +53,7 @@ impl Default for MultiCompiler {
         let resolc = which::which("resolc")
             .ok()
             .zip(solc.clone())
-            .and_then(|(path, solc)| Resolc::new(path, solc.clone()).ok());
+            .and_then(|(path, solc)| Resolc::new(path, solc).ok());
 
         Self { resolc, vyper, solc, use_resolc: true }
     }
@@ -320,14 +320,12 @@ impl Compiler for MultiCompiler {
                         return Compiler::compile(resolc, &input)
                             .map(|res| res.map_err(MultiCompilerError::Solc));
                     }
-                } else {
-                    if let Some(solc) = &self.solc {
-                        return Compiler::compile(solc, input)
-                            .map(|res| res.map_err(MultiCompilerError::Solc));
-                    }
+                } else if let Some(solc) = &self.solc {
+                    return Compiler::compile(solc, input)
+                        .map(|res| res.map_err(MultiCompilerError::Solc));
                 }
 
-                return Err(SolcError::msg("resolc compiler is not available"));
+                Err(SolcError::msg("resolc compiler is not available"))
             }
             MultiCompilerInput::Vyper(input) => {
                 if let Some(vyper) = &self.vyper {
