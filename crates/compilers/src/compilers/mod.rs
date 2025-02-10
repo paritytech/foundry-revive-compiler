@@ -21,7 +21,6 @@ use std::{
 };
 
 pub mod multi;
-pub mod resolc;
 pub mod solc;
 pub mod vyper;
 pub use vyper::*;
