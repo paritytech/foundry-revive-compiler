@@ -52,10 +52,10 @@ impl Default for MultiCompiler {
 
         let resolc = which::which("resolc")
             .ok()
-            .zip(solc.clone())
+            .zip(solc)
             .and_then(|(path, solc)| Resolc::new(path, solc).ok());
 
-        Self { resolc, vyper, solc, use_resolc: true }
+        Self { resolc, vyper, solc: None, use_resolc: true }
     }
 }
 
@@ -67,10 +67,13 @@ impl MultiCompiler {
         use_resolc: bool,
     ) -> Result<Self> {
         let vyper = vyper_path.map(Vyper::new).transpose()?;
-        let resolc = resolc_path
-            .zip(solc.clone())
-            .map(|(path, solc)| Resolc::new(path, solc))
-            .transpose()?;
+        let (solc, resolc) = if use_resolc {
+            let resolc =
+                resolc_path.zip(solc).map(|(path, solc)| Resolc::new(path, solc)).transpose()?;
+            (None, resolc)
+        } else {
+            (solc, None)
+        };
         Ok(Self { resolc, solc, vyper, use_resolc })
     }
 }
@@ -341,6 +344,13 @@ impl Compiler for MultiCompiler {
     fn available_versions(&self, language: &Self::Language) -> Vec<CompilerVersion> {
         match language {
             MultiCompilerLanguage::Solc(language) => {
+                if self.use_resolc {
+                    return self
+                        .resolc
+                        .as_ref()
+                        .map(|s| s.available_versions(language))
+                        .unwrap_or_default();
+                };
                 self.solc.as_ref().map(|s| s.available_versions(language)).unwrap_or_default()
             }
             MultiCompilerLanguage::Vyper(language) => {
