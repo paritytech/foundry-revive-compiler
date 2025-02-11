@@ -1,7 +1,5 @@
 use crate::{
-    error::{Result, SolcError},
-    resolver::parse::SolData,
-    Compiler, CompilerVersion,
+    error::{Result, SolcError}, resolver::parse::SolData, solc::SolcSettings, Compiler, CompilerVersion
 };
 use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Error, SolcLanguage};
 use itertools::Itertools;
@@ -23,7 +21,7 @@ use which;
 
 #[cfg(target_family = "unix")]
 #[cfg(feature = "async")]
-use super::{ResolcInput, ResolcSettings, ResolcVersionedInput};
+use super::{ResolcInput, ResolcVersionedInput};
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct SolcBuild {
@@ -120,7 +118,7 @@ impl Compiler for Resolc {
     type Input = ResolcVersionedInput;
     type CompilationError = Error;
     type ParsedSource = SolData;
-    type Settings = ResolcSettings;
+    type Settings = SolcSettings;
     type Language = SolcLanguage;
 
     /// Instead of using specific sols version we are going to autodetect
@@ -216,9 +214,9 @@ impl Resolc {
         Ok(Self {
             resolc: self.resolc.clone(),
             solc: Some(solc_path),
-            base_path: input.input.settings.resolc_settings.base_path.clone(),
-            allow_paths: input.input.settings.resolc_settings.allow_paths.clone(),
-            include_paths: input.input.settings.resolc_settings.include_paths.clone(),
+            base_path: input.input.settings.cli_settings.base_path.clone(),
+            allow_paths: input.input.settings.cli_settings.allow_paths.clone(),
+            include_paths: input.input.settings.cli_settings.include_paths.clone(),
             solc_version_info,
             extra_args: Vec::new(),
         })

@@ -109,13 +109,14 @@ use crate::{
         resolc_artifact_output::{ContractArtifact, ResolcArtifactOutput},
     },
     compilers::{
-        resolc::{Resolc, ResolcSettings, ResolcVersionedInput},
+        resolc::{Resolc, ResolcVersionedInput},
         CompilerInput,
     },
     filter::SparseOutputFilter,
     output::Builds,
     report,
     resolver::{parse::SolData, GraphEdges},
+    solc::SolcSettings,
     ArtifactOutput, CompilerSettings, Graph, Project, Sources,
 };
 use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, SolcLanguage};
@@ -128,7 +129,7 @@ use super::raw_build_info_new;
 
 /// A set of different Solc installations with their version and the sources to be compiled
 pub(crate) type VersionedSources<'a, L> =
-    HashMap<L, Vec<(Version, Sources, (&'a str, &'a ResolcSettings))>>;
+    HashMap<L, Vec<(Version, Sources, (&'a str, &'a SolcSettings))>>;
 
 #[derive(Debug)]
 pub struct ProjectCompiler<'a> {

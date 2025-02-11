@@ -1,5 +1,4 @@
-use super::ResolcSettings;
-use crate::CompilerInput;
+use crate::{solc::SolcSettings, CompilerInput};
 use foundry_compilers_artifacts::{SolcLanguage, Source, Sources};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -16,7 +15,7 @@ pub struct ResolcVersionedInput {
 pub struct ResolcInput {
     pub language: SolcLanguage,
     pub sources: Sources,
-    pub settings: ResolcSettings,
+    pub settings: SolcSettings,
 }
 
 impl Default for ResolcInput {
@@ -24,13 +23,13 @@ impl Default for ResolcInput {
         Self {
             language: SolcLanguage::Solidity,
             sources: Sources::default(),
-            settings: ResolcSettings::default(),
+            settings: SolcSettings::default(),
         }
     }
 }
 
 impl CompilerInput for ResolcVersionedInput {
-    type Settings = ResolcSettings;
+    type Settings = SolcSettings;
     type Language = SolcLanguage;
 
     fn build(
@@ -65,7 +64,7 @@ impl CompilerInput for ResolcVersionedInput {
 }
 
 impl ResolcInput {
-    fn new(language: SolcLanguage, sources: Sources, settings: ResolcSettings) -> Self {
+    fn new(language: SolcLanguage, sources: Sources, settings: SolcSettings) -> Self {
         Self { language, sources, settings }
     }
     pub fn strip_prefix(&mut self, base: impl AsRef<Path>) {
