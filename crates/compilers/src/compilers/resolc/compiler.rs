@@ -18,11 +18,11 @@ use std::{
 
 use super::{ResolcInput, ResolcVersionedInput};
 
-#[derive(Clone, Debug)]
-/// solc and solc version may not be read anywhere in this code but
+/// resolc and solc version may not be read anywhere in this code but
 /// I forsee their use elswhere in the foundry project
 /// So for now we keep them if needed we can remove them in future
-/// Itterations
+/// Iterations
+#[derive(Clone, Debug)]
 pub struct Resolc {
     pub resolc: PathBuf,
     pub solc: SolcCompiler,
@@ -58,10 +58,15 @@ impl Compiler for Resolc {
 
 impl Default for Resolc {
     fn default() -> Self {
-        Self {
-            resolc: which::which("resolc").expect("Resolc binary must be installed."),
-            solc: SolcCompiler::AutoDetect,
-        }
+        #[cfg(feature = "svm-solc")]
+        let solc = SolcCompiler::AutoDetect;
+        #[cfg(not(feature = "svm-solc"))]
+        let solc = crate::solc::Solc::new("solc")
+            .map(SolcCompiler::Specific)
+            .ok()
+            .expect("Solc binary must be already installed");
+
+        Self { resolc: which::which("resolc").expect("Resolc binary must be installed."), solc }
     }
 }
 
@@ -82,12 +87,12 @@ impl Resolc {
         Ok(Self { resolc: revive_path, solc: SolcCompiler::Specific(solc) })
     }
 
-    fn solc(&self, input: &ResolcVersionedInput) -> Result<Solc> {
+    fn solc(&self, _input: &ResolcVersionedInput) -> Result<Solc> {
         let solc = match &self.solc {
             SolcCompiler::Specific(solc) => solc.clone(),
 
             #[cfg(feature = "svm-solc")]
-            SolcCompiler::AutoDetect => Solc::find_or_install(&input.solc_version)?,
+            SolcCompiler::AutoDetect => Solc::find_or_install(&_input.solc_version)?,
         };
 
         Ok(solc)
@@ -136,10 +141,7 @@ impl Resolc {
             cmd.arg("--base-path").arg(base_path);
             cmd.current_dir(base_path);
         }
-        let mut settings = input.settings.clone();
-        settings.sanitize(&solc.version, input.language);
-        let input =
-            &ResolcInput { settings, sources: input.sources.clone(), language: input.language };
+
         let child = if matches!(&input.language, SolcLanguage::Solidity) {
             cmd.arg("--solc");
             cmd.arg(&solc.solc);

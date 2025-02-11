@@ -282,7 +282,6 @@ fn can_compile_configured() {
     assert!(artifact.ir.is_some());
     assert!(artifact.ir_optimized.is_some());
     assert!(artifact.opcodes.is_some());
-    assert!(artifact.opcodes.is_some());
     assert!(artifact.legacy_assembly.is_some());
 }
 
@@ -1452,7 +1451,7 @@ fn can_flatten_experimental_in_other_file() {
         .add_source(
             "A.sol",
             r#"
-pragma solidity 0.6.12;
+pragma solidity 0.8.28;
 pragma experimental ABIEncoderV2;
 
 contract A {}
@@ -1464,7 +1463,7 @@ contract A {}
         .add_source(
             "B.sol",
             r#"
-pragma solidity 0.6.12;
+pragma solidity 0.8.28;
 
 import "./A.sol";
 
@@ -1476,7 +1475,7 @@ contract B is A {}
     let result = Flattener::new(project.project().clone(), &target).unwrap().flatten();
     assert_eq!(
         result,
-        r"pragma solidity =0.6.12;
+        r"pragma solidity =0.8.28;
 pragma experimental ABIEncoderV2;
 
 // src/A.sol
@@ -2914,8 +2913,7 @@ fn compile_project_with_options(
         builder = builder.set_compiler_severity_filter(severity);
     }
 
-    let mut project = builder.build(Default::default()).unwrap();
-    let _ = project.settings.solc.evm_version = Some(EvmVersion::Berlin);
+    let project = builder.build(Default::default()).unwrap();
 
     project.compile().unwrap()
 }

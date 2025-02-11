@@ -311,12 +311,11 @@ impl Compiler for MultiCompiler {
                 if self.use_resolc {
                     if let Some(resolc) = &self.resolc {
                         let input = input.clone();
+                        let settings =
+                            input.input.settings.sanitized(&input.version, input.input.language);
                         let input = ResolcVersionedInput::build(
                             input.input.sources,
-                            SolcSettings {
-                                settings: input.input.settings,
-                                cli_settings: input.cli_settings,
-                            },
+                            SolcSettings { settings, cli_settings: input.cli_settings },
                             input.input.language,
                             input.version,
                         );

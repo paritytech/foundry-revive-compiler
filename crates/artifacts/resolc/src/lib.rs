@@ -1,3 +1,5 @@
+//! Resolc artifact types.
+
 use std::{collections::BTreeMap, path::PathBuf};
 
 pub mod contract;
@@ -6,10 +8,6 @@ use foundry_compilers_artifacts_solc::{
     Bytecode, BytecodeObject, DeployedBytecode, Error, FileToContractsMap, SourceFile,
 };
 use serde::{Deserialize, Serialize};
-
-/// This file contains data structures that we need defined locally as some of them need to be used
-/// in trait Implementation in such a way that they are owned so if we use existing structures from
-/// Revive We will run into issues
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct ResolcCompilerOutput {
