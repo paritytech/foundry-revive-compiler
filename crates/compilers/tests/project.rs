@@ -105,7 +105,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
         use std::{fs::Permissions, os::unix::fs::PermissionsExt};
         let solc = SolcCompiler::default();
 
-        if let Ok(resolc) = Resolc::new("resolc", solc) {
+        if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
             return resolc;
         }
 
@@ -113,7 +113,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
         let path = std::env::temp_dir().join("resolc");
 
         if path.exists() {
-            return Resolc::new(&path, solc).unwrap();
+            return Resolc::new(&path, solc.clone()).unwrap();
         }
 
         let url = "https://github.com/paritytech/revive/releases/download/v0.1.0-dev.11/resolc-static-linux".to_owned();
