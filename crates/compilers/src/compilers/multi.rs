@@ -344,7 +344,13 @@ impl Compiler for MultiCompiler {
                         .resolc
                         .as_ref()
                         .map(|s| s.available_versions(language))
-                        .unwrap_or_default();
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|version| match version {
+                            CompilerVersion::Installed(version)
+                            | CompilerVersion::Remote(version) => version.minor >= 8,
+                        })
+                        .collect::<Vec<_>>();
                 };
                 self.solc.as_ref().map(|s| s.available_versions(language)).unwrap_or_default()
             }
