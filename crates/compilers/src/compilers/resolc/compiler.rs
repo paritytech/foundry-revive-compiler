@@ -69,12 +69,15 @@ impl Default for Resolc {
 }
 
 impl Resolc {
-    pub fn new(resolc_path: PathBuf, solc_compiler: SolcCompiler) -> Result<Self> {
+    pub fn new(resolc_path: impl Into<PathBuf>, solc_compiler: SolcCompiler) -> Result<Self> {
+        let resolc_path = resolc_path.into();
         let resolc_version = Self::get_version_for_path(&resolc_path)?;
         Ok(Self { resolc_version, resolc: resolc_path, solc: solc_compiler })
     }
 
-    pub fn new_from_path(resolc_path: PathBuf, solc_path: PathBuf) -> Result<Self> {
+    pub fn new_from_path(resolc_path: impl Into<PathBuf>, solc_path: PathBuf) -> Result<Self> {
+        let resolc_path = resolc_path.into();
+
         let solc = Solc::new(solc_path)?;
         let resolc_version = Self::get_version_for_path(&resolc_path)?;
         Ok(Self { resolc_version, resolc: resolc_path, solc: SolcCompiler::Specific(solc) })

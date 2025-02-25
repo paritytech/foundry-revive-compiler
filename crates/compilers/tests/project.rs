@@ -105,7 +105,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
         use std::{fs::Permissions, os::unix::fs::PermissionsExt};
         let solc = SolcCompiler::default();
 
-        if let Ok(resolc) = Resolc::new("resolc".into(), solc) {
+        if let Ok(resolc) = Resolc::new("resolc", solc) {
             return resolc;
         }
 
@@ -116,7 +116,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             return Resolc::new(&path, solc).unwrap();
         }
 
-        let url = "https://github.com/paritytech/revive/releases/download/v0.1.0-dev.11/resolc-static-linux";
+        let url = "https://github.com/paritytech/revive/releases/download/v0.1.0-dev.11/resolc-static-linux".to_owned();
 
         let mut retry = 3;
         let mut res = None;
@@ -146,7 +146,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
     #[cfg(not(target_os = "linux"))]
     {
         let solc = SolcCompiler::default();
-        Resolc::new("resolc".into(), solc).expect("failed to get resolc binary")
+        Resolc::new("resolc", solc).expect("failed to get resolc binary")
     }
 });
 
