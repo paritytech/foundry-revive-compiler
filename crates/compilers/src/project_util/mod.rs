@@ -67,8 +67,7 @@ impl<
         };
         let solc = SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap());
         if self.inner.compiler.use_resolc {
-            self.inner.compiler.resolc =
-                Some(Resolc::new(which::which("resolc").unwrap(), solc).unwrap());
+            self.inner.compiler.resolc = Some(Resolc::new("resolc".into(), solc).unwrap());
         } else {
             self.inner.compiler.solc = Some(solc);
         };

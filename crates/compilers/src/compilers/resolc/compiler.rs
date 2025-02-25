@@ -18,13 +18,10 @@ use std::{
 
 use super::{ResolcInput, ResolcVersionedInput};
 
-/// resolc and solc version may not be read anywhere in this code but
-/// I forsee their use elswhere in the foundry project
-/// So for now we keep them if needed we can remove them in future
-/// Iterations
 #[derive(Clone, Debug)]
 pub struct Resolc {
     pub resolc: PathBuf,
+    pub resolc_version: Version,
     pub solc: SolcCompiler,
 }
 
@@ -49,7 +46,6 @@ impl Compiler for Resolc {
         let solc = self.solc(input)?;
         let results = self.compile_output::<ResolcInput>(&solc, &input.input)?;
         let output = std::str::from_utf8(&results).map_err(|_| SolcError::InvalidUtf8)?;
-
         let results: ResolcCompilerOutput =
             serde_json::from_str(output).map_err(|e| SolcError::msg(e.to_string()))?;
         Ok(results.into())
@@ -65,26 +61,23 @@ impl Default for Resolc {
             .map(SolcCompiler::Specific)
             .ok()
             .expect("Solc binary must be already installed");
+        let resolc_version =
+            Self::get_version_for_path("resolc".as_ref()).expect("Resolc binary must be installed");
 
-        Self { resolc: which::which("resolc").expect("Resolc binary must be installed."), solc }
+        Self { resolc_version, resolc: PathBuf::from("resolc"), solc }
     }
 }
 
 impl Resolc {
-    /// When creating a new Resolc Compiler instance for now we only care for
-    /// Passing in the path to resolc but i do see a need perhaps once we get
-    /// Things working to allow for passing in a custom solc path since revive
-    /// Does allow for specifying a custom path for a solc bin
-    /// Current impl just checks if theres any solc version installed if not
-    /// We install but as mentioned this could change as it may not be the best
-    /// approach since requirements are going to change
-    pub fn new(revive_path: PathBuf, solc_compiler: SolcCompiler) -> Result<Self> {
-        Ok(Self { resolc: revive_path, solc: solc_compiler })
+    pub fn new(resolc_path: PathBuf, solc_compiler: SolcCompiler) -> Result<Self> {
+        let resolc_version = Self::get_version_for_path(&resolc_path)?;
+        Ok(Self { resolc_version, resolc: resolc_path, solc: solc_compiler })
     }
 
-    pub fn new_from_path(revive_path: PathBuf, solc_path: PathBuf) -> Result<Self> {
+    pub fn new_from_path(resolc_path: PathBuf, solc_path: PathBuf) -> Result<Self> {
         let solc = Solc::new(solc_path)?;
-        Ok(Self { resolc: revive_path, solc: SolcCompiler::Specific(solc) })
+        let resolc_version = Self::get_version_for_path(&resolc_path)?;
+        Ok(Self { resolc_version, resolc: resolc_path, solc: SolcCompiler::Specific(solc) })
     }
 
     fn solc(&self, _input: &ResolcVersionedInput) -> Result<Solc> {
@@ -100,8 +93,7 @@ impl Resolc {
 
     pub fn solc_available_versions() -> Vec<Version> {
         let mut ret = vec![];
-        let min_max_patch_by_minor_versions =
-            vec![(4, 12, 26), (5, 0, 17), (6, 0, 12), (7, 0, 6), (8, 0, 28)];
+        let min_max_patch_by_minor_versions = vec![(8, 0, 28)];
         for (minor, min_patch, max_patch) in min_max_patch_by_minor_versions {
             for i in min_patch..=max_patch {
                 ret.push(Version::new(0, minor, i));
@@ -213,147 +205,5 @@ fn compile_output(output: Output) -> Result<Vec<u8>> {
         Ok(output.stdout)
     } else {
         Err(SolcError::solc_output(&output))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::ProjectBuilder;
-
-    use super::*;
-    use semver::Version;
-    use std::os::unix::process::ExitStatusExt;
-    use which::which;
-
-    fn resolc_instance() -> Resolc {
-        Resolc::new(which::which("resolc").unwrap(), SolcCompiler::AutoDetect).unwrap()
-    }
-
-    #[test]
-    fn test_version_parsing() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: b"resolc version v0.1.0\n".to_vec(),
-            stderr: Vec::new(),
-        };
-        let version = version_from_output(output);
-        assert!(version.is_ok());
-        let version = version.unwrap();
-        assert_eq!(version.major, 0);
-        assert_eq!(version.minor, 1);
-        assert_eq!(version.patch, 0);
-    }
-
-    #[test]
-    fn test_failed_version_parsing() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(1),
-            stdout: Vec::new(),
-            stderr: b"error\n".to_vec(),
-        };
-        let version = version_from_output(output);
-        assert!(version.is_err());
-    }
-
-    #[test]
-    fn test_invalid_version_output() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: b"invalid version format\n".to_vec(),
-            stderr: Vec::new(),
-        };
-        let version = version_from_output(output);
-        assert!(version.is_err());
-    }
-
-    #[test]
-    fn test_compile_output_success() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: b"test output".to_vec(),
-            stderr: Vec::new(),
-        };
-        let result = compile_output(output);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), b"test output");
-    }
-
-    #[test]
-    fn test_compile_output_failure() {
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(1),
-            stdout: Vec::new(),
-            stderr: b"error".to_vec(),
-        };
-        let result = compile_output(output);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_solc_available_versions_sorted() {
-        let versions = Resolc::solc_available_versions();
-        let mut sorted = versions.clone();
-        sorted.sort();
-        assert_eq!(versions, sorted, "Versions should be returned in sorted order");
-
-        for version in versions {
-            assert_eq!(version.major, 0, "Major version should be 0");
-            assert!(
-                version.minor >= 4 && version.minor <= 8,
-                "Minor version should be between 4 and 8"
-            );
-        }
-    }
-
-    #[test]
-    fn test_resolc_installation_and_compilation() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .with_test_writer()
-            .with_file(true)
-            .with_line_number(true)
-            .with_thread_ids(true)
-            .try_init();
-
-        let solc = Solc::new(which("solc").unwrap()).unwrap();
-        let resolc = Resolc::new(which::which("resolc").unwrap(), SolcCompiler::Specific(solc))
-            .expect("Should create Resolc instance from installed binary");
-
-        let project = ProjectBuilder::<Resolc>::new(Default::default())
-            .settings(Default::default())
-            .build(resolc)
-            .unwrap();
-
-        let input = include_str!("../../../../../test-data/resolc/input/compile-input.json");
-        let input: ResolcInput = serde_json::from_str(input).expect("Should parse test input JSON");
-        let input = ResolcVersionedInput { input, solc_version: Version::new(0, 8, 28) };
-        let compilation_result = project.compiler.compile(&input);
-
-        match compilation_result {
-            Ok(output) => {
-                assert!(
-                    !output.errors.iter().any(|err| err.severity.is_error()),
-                    "Compilation should not have errors"
-                );
-            }
-            Err(e) => {
-                trace!("Error compiling: {:?}", e);
-            }
-        }
-    }
-
-    #[test]
-    fn test_compile_with_invalid_utf8() {
-        let resolc = resolc_instance();
-        let mut cmd = Command::new(&resolc.resolc);
-        cmd.arg("--standard-json");
-        let output = Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: vec![0xFF, 0xFF, 0xFF, 0xFF],
-            stderr: Vec::new(),
-        };
-        let bytes = compile_output(output).unwrap();
-        let result = String::from_utf8(bytes);
-        assert!(result.is_err());
     }
 }

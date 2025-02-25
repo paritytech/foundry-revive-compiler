@@ -50,12 +50,7 @@ impl Default for MultiCompiler {
         #[cfg(not(feature = "svm-solc"))]
         let solc = crate::solc::Solc::new("solc").map(SolcCompiler::Specific).ok();
 
-        let resolc = which::which("resolc")
-            .ok()
-            .zip(solc)
-            .and_then(|(path, solc)| Resolc::new(path, solc).ok());
-
-        Self { resolc, vyper, solc: None, use_resolc: true }
+        Self { resolc: None, vyper, solc, use_resolc: false }
     }
 }
 
@@ -311,11 +306,12 @@ impl Compiler for MultiCompiler {
                 if self.use_resolc {
                     if let Some(resolc) = &self.resolc {
                         let input = input.clone();
-                        let settings =
-                            input.input.settings.sanitized(&input.version, input.input.language);
                         let input = ResolcVersionedInput::build(
                             input.input.sources,
-                            SolcSettings { settings, cli_settings: input.cli_settings },
+                            SolcSettings {
+                                settings: input.input.settings,
+                                cli_settings: input.cli_settings,
+                            },
                             input.input.language,
                             input.version,
                         );

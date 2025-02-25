@@ -33,7 +33,6 @@ thiserror.workspace = true
 path-slash.workspace = true
 yansi.workspace = true
 solar-parse.workspace = true
-which.workspace = true
 futures-util = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
@@ -68,6 +67,7 @@ reqwest = "0.12"
 tempfile = "3.9"
 snapbox.workspace = true
 foundry-compilers-core = { workspace = true, features = ["test-utils"] }
+rstest = "0.24.0"
 
 [features]
 default = ["rustls", "async", "svm-solc", "project-util"]

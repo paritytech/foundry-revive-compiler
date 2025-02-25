@@ -27,6 +27,9 @@ pub struct ResolcContract {
     /// Contract's bytecode and related objects
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evm: Option<ResolcEVM>,
+    /// The contract IR code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ir: Option<String>,
     /// The contract optimized IR code.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ir_optimized: Option<String>,
@@ -39,18 +42,6 @@ pub struct ResolcContract {
     /// The contract missing libraries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub missing_libraries: Option<HashSet<String>>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
-struct Output {
-    devdoc: DevDoc,
-    userdoc: UserDoc,
-    abi: JsonAbi,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
-struct Meta {
-    output: Output,
 }
 
 impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
@@ -69,19 +60,13 @@ impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
             None => Default::default(),
         };
 
-        let Output { abi, devdoc, userdoc } = meta
-            .as_ref()
-            .and_then(|meta| serde_json::from_str::<Meta>(&meta.raw_metadata).ok())
-            .map(|i| i.output)
-            .unwrap_or_default();
-
         Self {
-            abi: contract.abi.or(Some(abi)),
+            abi: contract.abi.or_else(Default::default),
             evm: contract.evm.map(Into::into),
             metadata: meta,
-            userdoc: contract.userdoc.unwrap_or(userdoc),
-            devdoc: contract.devdoc.unwrap_or(devdoc),
-            ir: None,
+            userdoc: contract.userdoc.unwrap_or_default(),
+            devdoc: contract.devdoc.unwrap_or_default(),
+            ir: contract.ir,
             storage_layout: contract.storage_layout.unwrap_or_default(),
             transient_storage_layout: Default::default(),
             ewasm: None,

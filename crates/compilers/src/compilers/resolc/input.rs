@@ -2,9 +2,9 @@ use foundry_compilers_artifacts::{SolcLanguage, Source, Sources};
 use foundry_compilers_core::utils::strip_prefix_owned;
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
-use crate::{solc::SolcSettings, CompilerInput};
+use crate::{solc::SolcSettings, CompilerInput, CompilerSettings};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResolcVersionedInput {
@@ -40,6 +40,32 @@ impl CompilerInput for ResolcVersionedInput {
         language: Self::Language,
         version: Version,
     ) -> Self {
+        let hash_set = HashSet::from([
+            "abi",
+            "metadata",
+            "devdoc",
+            "userdoc",
+            "evm.methodIdentifiers",
+            "storageLayout",
+            "ast",
+            "irOptimized",
+            "evm.legacyAssembly",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.assembly",
+            "ir",
+        ]);
+        let solc_settings = settings.settings.sanitized(&version, language);
+
+        let mut settings =
+            Self::Settings { settings: solc_settings, cli_settings: settings.cli_settings };
+        settings.update_output_selection(|selection| {
+            for (_, key) in selection.0.iter_mut() {
+                for (_, value) in key.iter_mut() {
+                    value.retain(|item| hash_set.contains(item.as_str()));
+                }
+            }
+        });
         let input = ResolcInput::new(language, sources, settings);
         Self { input, solc_version: version }
     }
