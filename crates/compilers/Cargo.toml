@@ -68,6 +68,8 @@ tempfile = "3.9"
 snapbox.workspace = true
 foundry-compilers-core = { workspace = true, features = ["test-utils"] }
 rstest = "0.24.0"
+flate2 = "*"
+tar = "0.4.44"
 
 [features]
 default = ["rustls", "async", "svm-solc", "project-util"]

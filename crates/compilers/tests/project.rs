@@ -99,9 +99,10 @@ pub static VYPER: LazyLock<Vyper> = LazyLock::new(|| {
 });
 
 pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
-    #[cfg(target_os = "linux")]
+    #[cfg(target_family = "unix")]
     {
         RuntimeOrHandle::new().block_on(async {
+        #[cfg(target_family = "unix")]
         use std::{fs::Permissions, os::unix::fs::PermissionsExt};
         let solc = SolcCompiler::default();
 
@@ -116,8 +117,15 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             return Resolc::new(&path, solc.clone()).unwrap();
         }
 
-        let url = "https://github.com/paritytech/revive/releases/download/v0.1.0-dev.11/resolc-static-linux".to_owned();
-
+        let base = "https://github.com/paritytech/revive/releases/download/untagged-39859d632653c9fd2456/resolc";
+        let url = format!(
+            "{base}-{}.tar.gz",
+            match platform() {
+                Platform::MacOsAarch64 => "macos",
+                Platform::LinuxAmd64 => "linux-static",
+                platform => panic!("unsupported platform: {platform:?}"),
+            }
+        );
         let mut retry = 3;
         let mut res = None;
         while retry > 0 {
@@ -132,37 +140,25 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
                 }
             }
         }
-        let res = res.expect("failed to get resolc binary");
+        let res = res.expect("failed to get resolc binary archive");
 
         let bytes = res.bytes().await.unwrap();
+        use flate2::read::GzDecoder;
+        use tar::Archive;
 
-        std::fs::write(&path, bytes).unwrap();
 
+        let tar = GzDecoder::new(bytes.as_ref());
+        let mut archive = Archive::new(tar);
+        archive.unpack(&path).expect("failed to unpack");
+
+
+        #[cfg(target_family = "unix")]
         std::fs::set_permissions(&path, Permissions::from_mode(0o755)).unwrap();
 
         Resolc::new(&path, solc).unwrap()
     })
     }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let solc = SolcCompiler::default();
-        Resolc::new("resolc", solc).expect("failed to get resolc binary")
-    }
 });
-
-// struct Case {
-//     name: String,
-//     compiler: MultiCompiler,
-// }
-
-// fn cases() -> impl Iterator<Item = Case> {
-
-//     [
-//         Case { name: "solc".to_owned(), compiler: MultiCompiler::default() },
-//         // Case { name: "resolc".to_owned(), compiler: resolc },
-//     ]
-//     .into_iter()
-// }
 
 #[fixture]
 #[once]
@@ -328,6 +324,36 @@ fn can_compile_configured(#[case] compiler: MultiCompiler) {
     assert!(artifact.ir_optimized.is_some());
     assert!(artifact.opcodes.is_some());
     assert!(artifact.legacy_assembly.is_some());
+}
+
+#[rstest]
+#[case::solc(MultiCompiler::default())]
+#[case::resolc(resolc())]
+fn can_compile_with_storage_layout(#[case] compiler: MultiCompiler) {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
+    let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
+
+    let handler = ConfigurableArtifacts {
+        additional_values: ExtraOutputValues {
+            metadata: true,
+            ir: true,
+            ir_optimized: true,
+            opcodes: true,
+            legacy_assembly: true,
+            storage_layout: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let settings = handler.solc_settings();
+    let mut project =
+        TempProject::with_artifacts(paths, handler).unwrap().with_solc_settings(settings);
+    project.project_mut().compiler = compiler;
+
+    let compiled = project.compile().unwrap();
+    let artifact = compiled.find_first("Dapp").unwrap();
+    assert!(artifact.storage_layout.is_some());
 }
 
 #[rstest]
