@@ -45,7 +45,7 @@ pub use foundry_compilers_core::{error, utils};
 
 use cache::CompilerCache;
 use compile::output::contracts::VersionedContracts;
-use compilers::multi::{MultiCompiler, SolidityCompiler};
+use compilers::multi::MultiCompiler;
 
 use foundry_compilers_artifacts::{
     output_selection::OutputSelection,
