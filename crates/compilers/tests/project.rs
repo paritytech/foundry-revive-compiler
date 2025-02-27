@@ -163,7 +163,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
 #[fixture]
 #[once]
 fn resolc() -> MultiCompiler {
-    MultiCompiler { solc: Some(SolidityCompiler::Resolc(RESOLC.clone())), ..Default::default() }
+    MultiCompiler { solidity: SolidityCompiler::Resolc(RESOLC.clone()), ..Default::default() }
 }
 
 #[rstest]
@@ -4336,7 +4336,7 @@ fn test_can_compile_multi(#[case] compiler: MultiCompiler) {
         solc: Default::default(),
     };
 
-    let compiler = MultiCompiler { solc: compiler.solc, vyper: Some(VYPER.clone()) };
+    let compiler = MultiCompiler { solidity: compiler.solidity, vyper: Some(VYPER.clone()) };
 
     let project = ProjectBuilder::<MultiCompiler>::new(Default::default())
         .settings(settings)

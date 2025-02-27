@@ -63,12 +63,15 @@ impl<
     pub fn set_solc(&mut self, solc: &str) -> &mut Self {
         use crate::solc::{Solc, SolcCompiler};
         let solc = SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap());
-        self.inner.compiler.solc.as_mut().map(|compiler| match compiler {
-            SolidityCompiler::Solc(s) => {
+        match &mut self.inner.compiler.solidity {
+            SolidityCompiler::Solc(ref mut s) => {
                 *s = solc;
             }
             SolidityCompiler::Resolc(resolc) => resolc.solc = solc,
-        });
+            SolidityCompiler::MissingInstallation => {
+                self.inner.compiler.solidity = SolidityCompiler::Solc(solc)
+            }
+        };
         self
     }
 }
