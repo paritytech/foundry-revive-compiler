@@ -15,7 +15,7 @@ use foundry_compilers::{
     },
     flatten::Flattener,
     info::ContractInfo,
-    multi::MultiCompilerRestrictions,
+    multi::{MultiCompilerRestrictions, SolidityCompiler},
     project_util::*,
     solc::{Restriction, SolcRestrictions, SolcSettings},
     take_solc_installer_lock, Artifact, ConfigurableArtifacts, ExtraOutputValues, Graph, Project,
@@ -163,12 +163,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
 #[fixture]
 #[once]
 fn resolc() -> MultiCompiler {
-    MultiCompiler {
-        use_resolc: true,
-        resolc: Some(RESOLC.clone()),
-        solc: None,
-        ..Default::default()
-    }
+    MultiCompiler { solc: Some(SolidityCompiler::Resolc(RESOLC.clone())), ..Default::default() }
 }
 
 #[rstest]
@@ -4341,12 +4336,7 @@ fn test_can_compile_multi(#[case] compiler: MultiCompiler) {
         solc: Default::default(),
     };
 
-    let compiler = MultiCompiler {
-        solc: compiler.solc,
-        resolc: compiler.resolc,
-        vyper: Some(VYPER.clone()),
-        use_resolc: compiler.use_resolc,
-    };
+    let compiler = MultiCompiler { solc: compiler.solc, vyper: Some(VYPER.clone()) };
 
     let project = ProjectBuilder::<MultiCompiler>::new(Default::default())
         .settings(settings)
