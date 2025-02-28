@@ -106,15 +106,25 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             use std::{fs::Permissions, os::unix::fs::PermissionsExt};
             let solc = SolcCompiler::default();
 
-            if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
-                return resolc;
-            }
+            // if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
+            //     return resolc;
+            // }
 
             take_solc_installer_lock!(_lock);
-            let path = std::env::temp_dir().join("resolc");
+            let path = std::env::temp_dir();
 
-            if path.exists() {
-                return Resolc::new(&path, solc.clone()).unwrap();
+            let bin = format!(
+                "resolc-{}",
+                match platform() {
+                    Platform::MacOsAarch64 => "macos",
+                    Platform::LinuxAmd64 => "static-linux",
+                    platform => panic!("unsupported platform: {platform:?}"),
+                }
+            );
+            let resolc_path = path.join(bin);
+
+            if resolc_path.exists() {
+                return Resolc::new(&resolc_path, solc.clone()).unwrap();
             }
 
             let base =
@@ -150,17 +160,13 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             let tar = GzDecoder::new(bytes.as_ref());
             let mut archive = Archive::new(tar);
             archive.unpack(&path).expect("failed to unpack");
-            #[cfg(target_os = "macos")]
-            {
-                std::process::Command::new("xattr")
-                    .args(["-c", &path.to_str().expect("failed to convert to a valid path")])
-                    .output()
-                    .expect("failed to execute process");
-            }
-            #[cfg(target_family = "unix")]
-            std::fs::set_permissions(&path, Permissions::from_mode(0o755)).unwrap();
 
-            Resolc::new(&path, solc).unwrap()
+            #[cfg(target_family = "unix")]
+            {
+                std::fs::set_permissions(&resolc_path, Permissions::from_mode(0o755)).unwrap();
+            }
+
+            Resolc::new(&resolc_path, solc).unwrap()
         })
     }
 });
