@@ -102,61 +102,66 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
     #[cfg(target_family = "unix")]
     {
         RuntimeOrHandle::new().block_on(async {
-        #[cfg(target_family = "unix")]
-        use std::{fs::Permissions, os::unix::fs::PermissionsExt};
-        let solc = SolcCompiler::default();
+            #[cfg(target_family = "unix")]
+            use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+            let solc = SolcCompiler::default();
 
-        if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
-            return resolc;
-        }
-
-        take_solc_installer_lock!(_lock);
-        let path = std::env::temp_dir().join("resolc");
-
-        if path.exists() {
-            return Resolc::new(&path, solc.clone()).unwrap();
-        }
-
-        let base = "https://github.com/paritytech/revive/releases/download/untagged-39859d632653c9fd2456/resolc";
-        let url = format!(
-            "{base}-{}.tar.gz",
-            match platform() {
-                Platform::MacOsAarch64 => "macos",
-                Platform::LinuxAmd64 => "linux-static",
-                platform => panic!("unsupported platform: {platform:?}"),
+            if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
+                return resolc;
             }
-        );
-        let mut retry = 3;
-        let mut res = None;
-        while retry > 0 {
-            match reqwest::get(&url).await.unwrap().error_for_status() {
-                Ok(res2) => {
-                    res = Some(res2);
-                    break;
+
+            take_solc_installer_lock!(_lock);
+            let path = std::env::temp_dir().join("resolc");
+
+            if path.exists() {
+                return Resolc::new(&path, solc.clone()).unwrap();
+            }
+
+            let base =
+                "https://github.com/paritytech/revive/releases/download/v0.1.0-dev.12/resolc";
+            let url = format!(
+                "{base}-{}.tar.gz",
+                match platform() {
+                    Platform::MacOsAarch64 => "macos",
+                    Platform::LinuxAmd64 => "linux-static",
+                    platform => panic!("unsupported platform: {platform:?}"),
                 }
-                Err(e) => {
-                    eprintln!("{e}");
-                    retry -= 1;
+            );
+            let mut retry = 3;
+            let mut res = None;
+            while retry > 0 {
+                match reqwest::get(&url).await.unwrap().error_for_status() {
+                    Ok(res2) => {
+                        res = Some(res2);
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("{e}");
+                        retry -= 1;
+                    }
                 }
             }
-        }
-        let res = res.expect("failed to get resolc binary archive");
+            let res = res.expect("failed to get resolc binary archive");
 
-        let bytes = res.bytes().await.unwrap();
-        use flate2::read::GzDecoder;
-        use tar::Archive;
+            let bytes = res.bytes().await.unwrap();
+            use flate2::read::GzDecoder;
+            use tar::Archive;
 
+            let tar = GzDecoder::new(bytes.as_ref());
+            let mut archive = Archive::new(tar);
+            archive.unpack(&path).expect("failed to unpack");
+            #[cfg(target_os = "macos")]
+            {
+                std::process::Command::new("xattr")
+                    .args(["-c", &path.to_str().expect("failed to convert to a valid path")])
+                    .output()
+                    .expect("failed to execute process");
+            }
+            #[cfg(target_family = "unix")]
+            std::fs::set_permissions(&path, Permissions::from_mode(0o755)).unwrap();
 
-        let tar = GzDecoder::new(bytes.as_ref());
-        let mut archive = Archive::new(tar);
-        archive.unpack(&path).expect("failed to unpack");
-
-
-        #[cfg(target_family = "unix")]
-        std::fs::set_permissions(&path, Permissions::from_mode(0o755)).unwrap();
-
-        Resolc::new(&path, solc).unwrap()
-    })
+            Resolc::new(&path, solc).unwrap()
+        })
     }
 });
 

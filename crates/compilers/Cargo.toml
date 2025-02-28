@@ -72,7 +72,7 @@ flate2 = "*"
 tar = "0.4.44"
 
 [features]
-default = ["rustls", "async", "svm-solc", "project-util"]
+default = ["rustls"]
 test-utils = []
 
 full = ["async", "svm-solc"]
