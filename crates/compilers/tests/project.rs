@@ -123,7 +123,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
                 "{base}-{}.tar.gz",
                 match platform() {
                     Platform::MacOsAarch64 => "macos",
-                    Platform::LinuxAmd64 => "linux-static",
+                    Platform::LinuxAmd64 => "static-linux",
                     platform => panic!("unsupported platform: {platform:?}"),
                 }
             );
