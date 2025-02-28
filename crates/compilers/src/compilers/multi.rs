@@ -53,15 +53,16 @@ impl Default for MultiCompiler {
         let vyper = Vyper::new("vyper").ok();
 
         #[cfg(feature = "svm-solc")]
-        let solc = Some(SolcCompiler::AutoDetect).map(SolidityCompiler::Solc);
+        let solc = SolidityCompiler::Solc(SolcCompiler::AutoDetect);
 
         #[cfg(not(feature = "svm-solc"))]
         let solc = crate::solc::Solc::new("solc")
             .map(SolcCompiler::Specific)
             .ok()
-            .map(SolidityCompiler::Solc);
+            .map(SolidityCompiler::Solc)
+            .unwrap_or_default();
 
-        Self { vyper, solidity: solc.unwrap_or_default() }
+        Self { vyper, solidity: solc }
     }
 }
 
