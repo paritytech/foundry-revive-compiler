@@ -83,7 +83,7 @@ impl CompilerInput for ResolcVersionedInput {
     }
 
     fn compiler_name(&self) -> std::borrow::Cow<'static, str> {
-        "resolc".into()
+        "Resolc".into()
     }
 
     fn strip_prefix(&mut self, base: &Path) {

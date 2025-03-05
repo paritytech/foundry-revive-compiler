@@ -68,7 +68,7 @@ impl fmt::Display for CompilerVersion {
 
 /// Compilation settings including evm_version, output_selection, etc.
 pub trait CompilerSettings:
-    Default + Serialize + DeserializeOwned + Clone + Debug + Send + Sync + 'static
+    Default + Serialize + DeserializeOwned + Clone + Debug + PartialEq + Send + Sync + 'static
 {
     /// We allow configuring settings restrictions which might optionally contain specific
     /// requiremets for compiler configuration. e.g. min/max evm_version, optimizer runs

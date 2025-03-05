@@ -32,7 +32,7 @@ mod config;
 pub use config::{PathStyle, ProjectPaths, ProjectPathsConfig, SolcConfig};
 
 mod filter;
-pub use filter::{FileFilter, SparseOutputFilter, TestFileFilter};
+pub use filter::{FileFilter, MaybeSolData, SparseOutputFilter, TestFileFilter};
 
 pub mod report;
 
