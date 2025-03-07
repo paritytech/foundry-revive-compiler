@@ -1,4 +1,4 @@
-pragma solidity >=0.8.0 <0.8.28;
+pragma solidity >=0.4.0 <0.5.0;
 
 contract E {
     function foo() public {}

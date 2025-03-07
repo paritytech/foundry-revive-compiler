@@ -59,7 +59,6 @@ impl Default for Resolc {
         #[cfg(not(feature = "svm-solc"))]
         let solc = crate::solc::Solc::new("solc")
             .map(SolcCompiler::Specific)
-            .ok()
             .expect("Solc binary must be already installed");
         let resolc_version =
             Self::get_version_for_path("resolc".as_ref()).expect("Resolc binary must be installed");
