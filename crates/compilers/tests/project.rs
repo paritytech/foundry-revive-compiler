@@ -106,9 +106,9 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             use std::{fs::Permissions, os::unix::fs::PermissionsExt};
             let solc = SolcCompiler::default();
 
-            // if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
-            //     return resolc;
-            // }
+            if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
+                return resolc;
+            }
 
             take_solc_installer_lock!(_lock);
             let path = std::env::temp_dir();
@@ -116,9 +116,9 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             let bin = format!(
                 "resolc-{}",
                 match platform() {
-                    Platform::MacOsAarch64 => "apple-darwin",
-                    Platform::LinuxAmd64 => "x86_64-unknown-linux-musl.tar.gz",
-                    Platform::WindowsAmd64 => "x86_64-pc-windows-msvc.zip",
+                    Platform::MacOsAarch64 => "universal-apple-darwin",
+                    Platform::LinuxAmd64 => "x86_64-unknown-linux-musl",
+                    Platform::WindowsAmd64 => "x86_64-pc-windows-msvc",
                     platform => panic!("unsupported platform: {platform:?}"),
                 }
             );
