@@ -118,7 +118,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
                 match platform() {
                     Platform::MacOsAarch64 => "universal-apple-darwin",
                     Platform::LinuxAmd64 => "x86_64-unknown-linux-musl",
-                    Platform::WindowsAmd64 => "x86_64-pc-windows-msvc",
+                    Platform::WindowsAmd64 => "x86_64-pc-windows-msvc.exe",
                     platform => panic!("unsupported platform: {platform:?}"),
                 }
             );
