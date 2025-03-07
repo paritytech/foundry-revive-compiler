@@ -116,8 +116,9 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             let bin = format!(
                 "resolc-{}",
                 match platform() {
-                    Platform::MacOsAarch64 => "macos",
-                    Platform::LinuxAmd64 => "static-linux",
+                    Platform::MacOsAarch64 => "apple-darwin",
+                    Platform::LinuxAmd64 => "x86_64-unknown-linux-musl.tar.gz",
+                    Platform::WindowsAmd64 => "x86_64-pc-windows-msvc.zip",
                     platform => panic!("unsupported platform: {platform:?}"),
                 }
             );
@@ -130,10 +131,11 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             let base =
                 "https://github.com/paritytech/revive/releases/download/v0.1.0-dev.12/resolc";
             let url = format!(
-                "{base}-{}.tar.gz",
+                "{base}-{}",
                 match platform() {
-                    Platform::MacOsAarch64 => "macos",
-                    Platform::LinuxAmd64 => "static-linux",
+                    Platform::MacOsAarch64 => "universal-apple-darwin.tar.gz",
+                    Platform::LinuxAmd64 => "x86_64-unknown-linux-musl.tar.gz",
+                    Platform::WindowsAmd64 => "x86_64-pc-windows-msvc.zip",
                     platform => panic!("unsupported platform: {platform:?}"),
                 }
             );
