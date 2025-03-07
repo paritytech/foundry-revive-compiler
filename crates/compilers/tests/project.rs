@@ -187,7 +187,6 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
 });
 
 #[fixture]
-#[once]
 fn resolc() -> MultiCompiler {
     MultiCompiler { solidity: SolidityCompiler::Resolc(RESOLC.clone()), ..Default::default() }
 }
