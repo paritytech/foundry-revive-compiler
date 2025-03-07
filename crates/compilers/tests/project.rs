@@ -156,12 +156,24 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
             let res = res.expect("failed to get resolc binary archive");
 
             let bytes = res.bytes().await.unwrap();
-            use flate2::read::GzDecoder;
-            use tar::Archive;
 
-            let tar = GzDecoder::new(bytes.as_ref());
-            let mut archive = Archive::new(tar);
-            archive.unpack(&path).expect("failed to unpack");
+            #[cfg(target_family = "unix")]
+            {
+                use flate2::read::GzDecoder;
+                use tar::Archive;
+
+                let tar = GzDecoder::new(bytes.as_ref());
+                let mut archive = Archive::new(tar);
+                archive.unpack(&path).expect("failed to unpack");
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                zip::ZipArchive::new(bytes)
+                    .expect("failed to unpack")
+                    .extract(&path)
+                    .expect("failed to extract")
+            }
 
             #[cfg(target_family = "unix")]
             {
