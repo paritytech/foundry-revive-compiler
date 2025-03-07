@@ -37,7 +37,7 @@ use similar_asserts::assert_eq;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs::{self},
-    io,
+    io::{self},
     path::{Path, PathBuf, MAIN_SEPARATOR},
     str::FromStr,
     sync::LazyLock,
@@ -169,10 +169,11 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
 
             #[cfg(target_os = "windows")]
             {
+                let bytes = std::io::Cursor::new(bytes);
                 zip::ZipArchive::new(bytes)
                     .expect("failed to unpack")
                     .extract(&path)
-                    .expect("failed to extract")
+                    .expect("Failed to extract")
             }
 
             #[cfg(target_family = "unix")]
