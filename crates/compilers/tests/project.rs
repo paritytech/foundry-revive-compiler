@@ -99,11 +99,11 @@ pub static VYPER: LazyLock<Vyper> = LazyLock::new(|| {
 });
 
 pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
-    #[cfg(target_family = "unix")]
     {
         RuntimeOrHandle::new().block_on(async {
             #[cfg(target_family = "unix")]
             use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+
             let solc = SolcCompiler::default();
 
             if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
