@@ -15,16 +15,14 @@ pub use artifact_output::*;
 pub mod buildinfo;
 
 pub mod cache;
-
 pub mod flatten;
-
 pub mod resolver;
 pub use resolver::Graph;
 
 pub mod compilers;
 pub use compilers::*;
 
-mod compile;
+pub mod compile;
 pub use compile::{
     output::{AggregatedCompilerOutput, ProjectCompileOutput},
     *,
@@ -34,7 +32,7 @@ mod config;
 pub use config::{PathStyle, ProjectPaths, ProjectPathsConfig, SolcConfig};
 
 mod filter;
-pub use filter::{FileFilter, SparseOutputFilter, TestFileFilter};
+pub use filter::{FileFilter, MaybeSolData, SparseOutputFilter, TestFileFilter};
 
 pub mod report;
 
@@ -48,6 +46,7 @@ pub use foundry_compilers_core::{error, utils};
 use cache::CompilerCache;
 use compile::output::contracts::VersionedContracts;
 use compilers::multi::MultiCompiler;
+
 use foundry_compilers_artifacts::{
     output_selection::OutputSelection,
     solc::{

@@ -38,7 +38,7 @@ pub struct TempProject<
     /// temporary workspace root
     _root: TempDir,
     /// actual project workspace with the `root` tempdir as its root
-    inner: Project<C, T>,
+    pub inner: Project<C, T>,
 }
 
 impl<
@@ -58,14 +58,58 @@ impl<
         self
     }
 
+    /// Overwrites(cli settings excluded) the settings to pass to `solc`
+    pub fn with_solc_settings_no_cli(mut self, settings: impl Into<Settings>) -> Self {
+        self.inner.settings.solc.settings = settings.into();
+
+        self
+    }
+
     /// Explicitly sets the solc version for the project
     #[cfg(feature = "svm-solc")]
     pub fn set_solc(&mut self, solc: &str) -> &mut Self {
         use crate::solc::{Solc, SolcCompiler};
+        let solc = SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap());
+        self.inner.compiler.solc = Some(solc);
+        self
+    }
+}
 
-        self.inner.compiler.solc =
-            Some(SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap()));
+use crate::resolc::Resolc;
 
+impl<
+        C: std::ops::DerefMut<Target = Resolc> + Default + Compiler<Settings = SolcSettings>,
+        T: ArtifactOutput<CompilerContract = <C as Compiler>::CompilerContract> + Default,
+    > TempProject<C, T>
+{
+    /// Creates a new temp project using the provided paths and artifacts handler.
+    /// sets the project root to a temp dir
+    #[cfg(feature = "svm-solc")]
+    pub fn with_artifacts(paths: ProjectPathsConfigBuilder, artifacts: T) -> Result<Self> {
+        Self::prefixed_with_artifacts("temp-project", paths, artifacts)
+    }
+
+    /// Overwrites the settings to pass to `solc`
+    pub fn with_solc_settings(mut self, settings: impl Into<Settings>) -> Self {
+        self.inner.settings.settings = settings.into();
+        self.inner.settings.cli_settings = Default::default();
+
+        self
+    }
+
+    /// Overwrites(cli settings excluded) the settings to pass to `solc`
+    pub fn with_solc_settings_no_cli(mut self, settings: impl Into<Settings>) -> Self {
+        self.inner.settings.settings = settings.into();
+
+        self
+    }
+
+    /// Explicitly sets the solc version for the project
+    #[cfg(feature = "svm-solc")]
+    pub fn set_solc(&mut self, solc: &str) -> &mut Self {
+        use crate::solc::{Solc, SolcCompiler};
+        let solc = SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap());
+        (*self.inner.compiler).solc = solc;
         self
     }
 }
@@ -439,15 +483,20 @@ contract {name} {{}}
 
 #[cfg(feature = "svm-solc")]
 impl TempProject {
-    pub fn dapptools_with_ignore_paths(paths_to_ignore: Vec<PathBuf>) -> Result<Self> {
+    pub fn dapptools_with_ignore_paths<
+        C: Compiler + Default,
+        T: ArtifactOutput<CompilerContract = C::CompilerContract> + Default,
+    >(
+        paths_to_ignore: Vec<PathBuf>,
+    ) -> Result<TempProject<C, T>> {
         let tmp_dir = tempdir("tmp_dapp")?;
         let paths = ProjectPathsConfig::dapptools(tmp_dir.path())?;
 
-        let inner = Project::builder()
+        let inner = ProjectBuilder::<C, T>::new(Default::default())
             .paths(paths)
             .ignore_paths(paths_to_ignore)
             .build(Default::default())?;
-        Ok(Self::create_new(tmp_dir, inner)?)
+        Ok(TempProject::create_new(tmp_dir, inner)?)
     }
 
     /// Clones the given repo into a temp dir, initializes it recursively and configures it.
