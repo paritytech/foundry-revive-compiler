@@ -77,8 +77,10 @@ impl<
 
 use crate::resolc::Resolc;
 
-impl<T: ArtifactOutput<CompilerContract = <Resolc as Compiler>::CompilerContract> + Default>
-    TempProject<Resolc, T>
+impl<
+        C: std::ops::DerefMut<Target = Resolc> + Default + Compiler<Settings = SolcSettings>,
+        T: ArtifactOutput<CompilerContract = <C as Compiler>::CompilerContract> + Default,
+    > TempProject<C, T>
 {
     /// Creates a new temp project using the provided paths and artifacts handler.
     /// sets the project root to a temp dir
@@ -107,7 +109,7 @@ impl<T: ArtifactOutput<CompilerContract = <Resolc as Compiler>::CompilerContract
     pub fn set_solc(&mut self, solc: &str) -> &mut Self {
         use crate::solc::{Solc, SolcCompiler};
         let solc = SolcCompiler::Specific(Solc::find_or_install(&solc.parse().unwrap()).unwrap());
-        self.inner.compiler.solc = solc;
+        (*self.inner.compiler).solc = solc;
         self
     }
 }
