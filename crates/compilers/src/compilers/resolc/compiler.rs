@@ -52,21 +52,6 @@ impl Compiler for Resolc {
     }
 }
 
-impl Default for Resolc {
-    fn default() -> Self {
-        #[cfg(feature = "svm-solc")]
-        let solc = SolcCompiler::AutoDetect;
-        #[cfg(not(feature = "svm-solc"))]
-        let solc = crate::solc::Solc::new("solc")
-            .map(SolcCompiler::Specific)
-            .expect("Solc binary must be already installed");
-        let resolc_version =
-            Self::get_version_for_path("resolc".as_ref()).expect("Resolc binary must be installed");
-
-        Self { resolc_version, resolc: PathBuf::from("resolc"), solc }
-    }
-}
-
 impl Resolc {
     pub fn new(resolc_path: impl Into<PathBuf>, solc_compiler: SolcCompiler) -> Result<Self> {
         let resolc_path = resolc_path.into();
