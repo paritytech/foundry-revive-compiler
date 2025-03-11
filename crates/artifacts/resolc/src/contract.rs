@@ -61,7 +61,7 @@ impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
         };
 
         Self {
-            abi: contract.abi.or_else(Default::default),
+            abi: contract.abi,
             evm: contract.evm.map(Into::into),
             metadata: meta,
             userdoc: contract.userdoc.unwrap_or_default(),

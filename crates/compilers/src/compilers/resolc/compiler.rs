@@ -70,18 +70,6 @@ impl Resolc {
         Ok(solc)
     }
 
-    pub fn solc_available_versions() -> Vec<Version> {
-        let mut ret = vec![];
-        let min_max_patch_by_minor_versions = vec![(8, 0, 28)];
-        for (minor, min_patch, max_patch) in min_max_patch_by_minor_versions {
-            for i in min_patch..=max_patch {
-                ret.push(Version::new(0, minor, i));
-            }
-        }
-
-        ret
-    }
-
     pub fn get_version_for_path(path: &Path) -> Result<Version> {
         let mut cmd = Command::new(path);
         cmd.arg("--version").stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());

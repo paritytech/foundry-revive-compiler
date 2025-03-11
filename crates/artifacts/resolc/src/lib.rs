@@ -99,7 +99,7 @@ impl From<ResolcBytecode> for Bytecode {
     fn from(value: ResolcBytecode) -> Self {
         Self {
             function_debug_data: BTreeMap::new(),
-            object: BytecodeObject::Unlinked(value.object),
+            object: BytecodeObject::Bytecode(value.object.into()),
             opcodes: None,
             source_map: None,
             generated_sources: vec![],
