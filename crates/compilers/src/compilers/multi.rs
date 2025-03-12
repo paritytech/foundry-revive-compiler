@@ -161,59 +161,85 @@ impl CompilerSettingsRestrictions for MultiCompilerRestrictions {
 /// Settings for the [MultiCompiler]. Includes settings for both Solc and Vyper compilers.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MultiCompilerSettings {
-    pub solc: SolcSettings,
+    pub solc: SolcMultiCompilerSettings,
     pub vyper: VyperSettings,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SolcMultiCompilerSettings {
+    #[serde(flatten)]
+    pub solc: SolcSettings,
+    pub compiler: CompilerName,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CompilerName {
+    #[default]
+    Solc,
+    Resolc,
 }
 
 impl CompilerSettings for MultiCompilerSettings {
     type Restrictions = MultiCompilerRestrictions;
 
     fn can_use_cached(&self, other: &Self) -> bool {
-        self.solc.can_use_cached(&other.solc) && self.vyper.can_use_cached(&other.vyper)
+        self.solc.solc.can_use_cached(&other.solc.solc) && self.vyper.can_use_cached(&other.vyper)
     }
 
     fn update_output_selection(&mut self, f: impl FnOnce(&mut OutputSelection) + Copy) {
-        self.solc.update_output_selection(f);
+        self.solc.solc.update_output_selection(f);
         self.vyper.update_output_selection(f);
     }
 
     fn with_allow_paths(self, allowed_paths: &BTreeSet<PathBuf>) -> Self {
         Self {
-            solc: self.solc.with_allow_paths(allowed_paths),
+            solc: SolcMultiCompilerSettings {
+                solc: self.solc.solc.with_allow_paths(allowed_paths),
+                compiler: self.solc.compiler,
+            },
             vyper: self.vyper.with_allow_paths(allowed_paths),
         }
     }
 
     fn with_base_path(self, base_path: &Path) -> Self {
         Self {
-            solc: self.solc.with_base_path(base_path),
+            solc: SolcMultiCompilerSettings {
+                solc: self.solc.solc.with_base_path(base_path),
+                compiler: self.solc.compiler,
+            },
             vyper: self.vyper.with_base_path(base_path),
         }
     }
 
     fn with_include_paths(self, include_paths: &BTreeSet<PathBuf>) -> Self {
         Self {
-            solc: self.solc.with_include_paths(include_paths),
+            solc: SolcMultiCompilerSettings {
+                solc: self.solc.solc.with_include_paths(include_paths),
+                compiler: self.solc.compiler,
+            },
             vyper: self.vyper.with_include_paths(include_paths),
         }
     }
 
     fn with_remappings(self, remappings: &[Remapping]) -> Self {
         Self {
-            solc: self.solc.with_remappings(remappings),
+            solc: SolcMultiCompilerSettings {
+                solc: self.solc.solc.with_remappings(remappings),
+                compiler: self.solc.compiler,
+            },
             vyper: self.vyper.with_remappings(remappings),
         }
     }
 
     fn satisfies_restrictions(&self, restrictions: &Self::Restrictions) -> bool {
-        self.solc.satisfies_restrictions(&restrictions.solc)
+        self.solc.solc.satisfies_restrictions(&restrictions.solc)
             && self.vyper.satisfies_restrictions(&restrictions.vyper)
     }
 }
 
 impl From<MultiCompilerSettings> for SolcSettings {
     fn from(settings: MultiCompilerSettings) -> Self {
-        settings.solc
+        settings.solc.solc
     }
 }
 
@@ -227,7 +253,7 @@ impl From<MultiCompilerSettings> for VyperSettings {
 #[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 pub enum MultiCompilerInput {
-    Solc(SolcVersionedInput),
+    Solc { input: SolcVersionedInput, compiler_name: CompilerName },
     Vyper(VyperVersionedInput),
 }
 
@@ -242,9 +268,10 @@ impl CompilerInput for MultiCompilerInput {
         version: Version,
     ) -> Self {
         match language {
-            MultiCompilerLanguage::Solc(language) => {
-                Self::Solc(SolcVersionedInput::build(sources, settings.solc, language, version))
-            }
+            MultiCompilerLanguage::Solc(language) => Self::Solc {
+                input: SolcVersionedInput::build(sources, settings.solc.solc, language, version),
+                compiler_name: settings.solc.compiler,
+            },
             MultiCompilerLanguage::Vyper(language) => {
                 Self::Vyper(VyperVersionedInput::build(sources, settings.vyper, language, version))
             }
@@ -253,35 +280,35 @@ impl CompilerInput for MultiCompilerInput {
 
     fn compiler_name(&self) -> Cow<'static, str> {
         match self {
-            Self::Solc(input) => input.compiler_name(),
+            Self::Solc { compiler_name, .. } => format!("{:?}", compiler_name).into(),
             Self::Vyper(input) => input.compiler_name(),
         }
     }
 
     fn language(&self) -> Self::Language {
         match self {
-            Self::Solc(input) => MultiCompilerLanguage::Solc(input.language()),
+            Self::Solc { input, .. } => MultiCompilerLanguage::Solc(input.language()),
             Self::Vyper(input) => MultiCompilerLanguage::Vyper(input.language()),
         }
     }
 
     fn strip_prefix(&mut self, base: &Path) {
         match self {
-            Self::Solc(input) => input.strip_prefix(base),
+            Self::Solc { input, .. } => input.strip_prefix(base),
             Self::Vyper(input) => input.strip_prefix(base),
         }
     }
 
     fn version(&self) -> &Version {
         match self {
-            Self::Solc(input) => input.version(),
+            Self::Solc { input, .. } => input.version(),
             Self::Vyper(input) => input.version(),
         }
     }
 
     fn sources(&self) -> impl Iterator<Item = (&Path, &Source)> {
         let ret: Box<dyn Iterator<Item = _>> = match self {
-            Self::Solc(input) => Box::new(input.sources()),
+            Self::Solc { input, .. } => Box::new(input.sources()),
             Self::Vyper(input) => Box::new(input.sources()),
         };
 
@@ -302,7 +329,7 @@ impl Compiler for MultiCompiler {
         input: &Self::Input,
     ) -> Result<CompilerOutput<Self::CompilationError, Self::CompilerContract>> {
         match input {
-            MultiCompilerInput::Solc(input) => match &self.solidity {
+            MultiCompilerInput::Solc { input, .. } => match &self.solidity {
                 SolidityCompiler::Solc(solc_compiler) => Compiler::compile(solc_compiler, input)
                     .map(|res| res.map_err(MultiCompilerError::Solc)),
                 SolidityCompiler::Resolc(resolc) => {
