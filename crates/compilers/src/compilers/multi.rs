@@ -280,7 +280,7 @@ impl CompilerInput for MultiCompilerInput {
 
     fn compiler_name(&self) -> Cow<'static, str> {
         match self {
-            Self::Solc { compiler_name, .. } => format!("{:?}", compiler_name).into(),
+            Self::Solc { compiler_name, .. } => format!("{compiler_name:?}").into(),
             Self::Vyper(input) => input.compiler_name(),
         }
     }
