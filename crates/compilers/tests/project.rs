@@ -4492,9 +4492,12 @@ contract SimpleContract {}
 }
 
 // <https://github.com/foundry-rs/foundry/issues/9876>
-#[test]
-fn can_flatten_top_level_event_declaration() {
-    let project = TempProject::<MultiCompiler>::dapptools().unwrap();
+#[rstest]
+#[case::solc(MultiCompiler::default())]
+#[case::resolc(resolc())]
+fn can_flatten_top_level_event_declaration(#[case] compiler: MultiCompiler) {
+    let mut project = TempProject::<MultiCompiler>::dapptools().unwrap();
+    project.project_mut().compiler = compiler;
 
     let target = project
         .add_source(
