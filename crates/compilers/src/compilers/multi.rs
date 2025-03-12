@@ -365,15 +365,7 @@ impl Compiler for MultiCompiler {
         match language {
             MultiCompilerLanguage::Solc(language) => match &self.solidity {
                 SolidityCompiler::Solc(solc_compiler) => solc_compiler.available_versions(language),
-                SolidityCompiler::Resolc(resolc) => resolc
-                    .available_versions(language)
-                    .into_iter()
-                    .filter(|version| match version {
-                        CompilerVersion::Installed(version) | CompilerVersion::Remote(version) => {
-                            version.minor >= 8
-                        }
-                    })
-                    .collect::<Vec<_>>(),
+                SolidityCompiler::Resolc(resolc) => resolc.available_versions(language),
                 SolidityCompiler::MissingInstallation => Default::default(),
             },
             MultiCompilerLanguage::Vyper(language) => {

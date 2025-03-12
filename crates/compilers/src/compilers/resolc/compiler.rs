@@ -36,7 +36,15 @@ impl Compiler for Resolc {
     /// Instead of using specific sols version we are going to autodetect
     /// Installed versions
     fn available_versions(&self, language: &SolcLanguage) -> Vec<CompilerVersion> {
-        self.solc.available_versions(language)
+        self.solc
+            .available_versions(language)
+            .into_iter()
+            .filter(|version| match version {
+                CompilerVersion::Installed(version) | CompilerVersion::Remote(version) => {
+                    version.minor >= 8 && version.patch <= 28
+                }
+            })
+            .collect::<Vec<_>>()
     }
 
     fn compile(
