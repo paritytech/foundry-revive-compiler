@@ -35,7 +35,7 @@ impl Default for ResolcInput {
 
 impl From<SolcVersionedInput> for ResolcVersionedInput {
     fn from(value: SolcVersionedInput) -> Self {
-        ResolcVersionedInput::build(
+        Self::build(
             value.input.sources,
             SolcSettings { settings: value.input.settings, cli_settings: value.cli_settings },
             value.input.language,
