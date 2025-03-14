@@ -2,7 +2,7 @@ use crate::{
     error::{Result, SolcError},
     resolver::parse::SolData,
     solc::{Solc, SolcCompiler, SolcSettings},
-    Compiler, CompilerVersion,
+    Compiler, CompilerVersion, SimpleCompilerName,
 };
 use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Contract, Error, SolcLanguage};
 use itertools::Itertools;
@@ -33,6 +33,10 @@ impl Compiler for Resolc {
     type Settings = SolcSettings;
     type Language = SolcLanguage;
 
+    fn compiler_name(&self, _input: &Self::Input) -> std::borrow::Cow<'static, str> {
+        Self::compiler_name_default()
+    }
+
     /// Instead of using specific sols version we are going to autodetect
     /// Installed versions
     fn available_versions(&self, language: &SolcLanguage) -> Vec<CompilerVersion> {
@@ -57,6 +61,12 @@ impl Compiler for Resolc {
         let results: ResolcCompilerOutput =
             serde_json::from_str(output).map_err(|e| SolcError::msg(e.to_string()))?;
         Ok(results.into())
+    }
+}
+
+impl SimpleCompilerName for Resolc {
+    fn compiler_name_default() -> std::borrow::Cow<'static, str> {
+        "resolc and solc".into()
     }
 }
 

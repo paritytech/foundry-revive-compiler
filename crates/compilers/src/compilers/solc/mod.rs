@@ -1,6 +1,6 @@
 use super::{
     restrictions::CompilerSettingsRestrictions, Compiler, CompilerInput, CompilerOutput,
-    CompilerSettings, CompilerVersion, Language, ParsedSource,
+    CompilerSettings, CompilerVersion, Language, ParsedSource, SimpleCompilerName,
 };
 use crate::{resolver::parse::SolData, CompilationError};
 pub use foundry_compilers_artifacts::SolcLanguage;
@@ -37,6 +37,12 @@ impl Language for SolcLanguage {
     const FILE_EXTENSIONS: &'static [&'static str] = SOLC_EXTENSIONS;
 }
 
+impl SimpleCompilerName for SolcCompiler {
+    fn compiler_name_default() -> Cow<'static, str> {
+        "Solc".into()
+    }
+}
+
 impl Compiler for SolcCompiler {
     type Input = SolcVersionedInput;
     type CompilationError = Error;
@@ -44,6 +50,10 @@ impl Compiler for SolcCompiler {
     type Settings = SolcSettings;
     type Language = SolcLanguage;
     type CompilerContract = Contract;
+
+    fn compiler_name(&self, _input: &Self::Input) -> Cow<'static, str> {
+        Self::compiler_name_default()
+    }
 
     fn compile(
         &self,
@@ -146,10 +156,6 @@ impl CompilerInput for SolcVersionedInput {
 
     fn sources(&self) -> impl Iterator<Item = (&Path, &Source)> {
         self.input.sources.iter().map(|(path, source)| (path.as_path(), source))
-    }
-
-    fn compiler_name(&self) -> Cow<'static, str> {
-        "Solc".into()
     }
 
     fn strip_prefix(&mut self, base: &Path) {

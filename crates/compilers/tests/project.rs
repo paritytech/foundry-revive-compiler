@@ -227,6 +227,9 @@ fn can_compile_hardhat_sample(#[case] compiler: MultiCompiler) {
 
     project.project_mut().compiler = compiler;
 
+    // `resolc` doens't work with `solc` <0.8.21 for this input
+    project.set_solc("0.8.21");
+
     let compiled = project.compile().unwrap();
     assert!(compiled.find_first("Greeter").is_some());
     assert!(compiled.find_first("console").is_some());

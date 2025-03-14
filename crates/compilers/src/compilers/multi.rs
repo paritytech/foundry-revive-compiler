@@ -7,7 +7,7 @@ use super::{
         VYPER_EXTENSIONS,
     },
     CompilationError, Compiler, CompilerInput, CompilerOutput, CompilerSettings, CompilerVersion,
-    Language, ParsedSource,
+    Language, ParsedSource, SimpleCompilerName,
 };
 use crate::{
     artifacts::vyper::{VyperCompilationError, VyperSettings},
@@ -251,13 +251,6 @@ impl CompilerInput for MultiCompilerInput {
         }
     }
 
-    fn compiler_name(&self) -> Cow<'static, str> {
-        match self {
-            Self::Solc(input) => input.compiler_name(),
-            Self::Vyper(input) => input.compiler_name(),
-        }
-    }
-
     fn language(&self) -> Self::Language {
         match self {
             Self::Solc(input) => MultiCompilerLanguage::Solc(input.language()),
@@ -296,6 +289,17 @@ impl Compiler for MultiCompiler {
     type Settings = MultiCompilerSettings;
     type Language = MultiCompilerLanguage;
     type CompilerContract = Contract;
+
+    fn compiler_name(&self, input: &Self::Input) -> Cow<'static, str> {
+        match input {
+            MultiCompilerInput::Solc(_) => match &self.solidity {
+                SolidityCompiler::Solc(_) => SolcCompiler::compiler_name_default(),
+                SolidityCompiler::Resolc(_) => Resolc::compiler_name_default(),
+                SolidityCompiler::MissingInstallation => "No applicablecompilers installed".into(),
+            },
+            MultiCompilerInput::Vyper(_) => Vyper::compiler_name_default(),
+        }
+    }
 
     fn compile(
         &self,

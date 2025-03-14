@@ -4,7 +4,10 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 
-use crate::{solc::SolcSettings, CompilerInput, CompilerSettings};
+use crate::{
+    solc::{SolcSettings, SolcVersionedInput},
+    CompilerInput, CompilerSettings,
+};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResolcVersionedInput {
@@ -27,6 +30,17 @@ impl Default for ResolcInput {
             sources: Sources::default(),
             settings: SolcSettings::default(),
         }
+    }
+}
+
+impl From<SolcVersionedInput> for ResolcVersionedInput {
+    fn from(value: SolcVersionedInput) -> Self {
+        ResolcVersionedInput::build(
+            value.input.sources,
+            SolcSettings { settings: value.input.settings, cli_settings: value.cli_settings },
+            value.input.language,
+            value.version,
+        )
     }
 }
 
@@ -80,10 +94,6 @@ impl CompilerInput for ResolcVersionedInput {
 
     fn sources(&self) -> impl Iterator<Item = (&Path, &Source)> {
         self.input.sources.iter().map(|(path, source)| (path.as_path(), source))
-    }
-
-    fn compiler_name(&self) -> std::borrow::Cow<'static, str> {
-        "resolc".into()
     }
 
     fn strip_prefix(&mut self, base: &Path) {
