@@ -68,7 +68,7 @@ tempfile = "3.18"
 snapbox.workspace = true
 foundry-compilers-core = { workspace = true, features = ["test-utils"] }
 rstest = "0.24.0"
-flate2 = "*"
+flate2 = "1.1.0"
 tar = "0.4.44"
 zip = "2.2.3"
 
