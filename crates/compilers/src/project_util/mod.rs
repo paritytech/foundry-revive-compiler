@@ -54,8 +54,7 @@ impl<
 
     /// Overwrites the settings to pass to `solc`
     pub fn with_solc_settings(mut self, settings: impl Into<Settings>) -> Self {
-        self.inner.settings.solc.solc =
-            SolcSettings { settings: settings.into(), ..Default::default() };
+        self.inner.settings.solc = SolcSettings { settings: settings.into(), ..Default::default() };
         self
     }
 

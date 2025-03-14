@@ -33,7 +33,6 @@ use foundry_compilers_core::{
 };
 use rstest::{fixture, rstest};
 use semver::Version;
-use serde::Deserialize;
 use similar_asserts::assert_eq;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
@@ -549,11 +548,6 @@ fn can_compile_dapp_detect_changes_in_sources(#[case] compiler: MultiCompiler) {
 #[case::solc(MultiCompiler::default())]
 #[case::resolc(resolc())]
 fn can_emit_build_info(#[case] compiler: MultiCompiler) {
-    #[derive(Deserialize)]
-    struct MultiCompilerInput {
-        #[allow(dead_code)]
-        pub input: SolcInput,
-    }
     let mut project = TempProject::<MultiCompiler>::dapptools().unwrap();
     project.project_mut().compiler = compiler;
     project.project_mut().build_info = true;
@@ -586,10 +580,9 @@ contract B { }
 
     let mut build_info_count = 0;
     for entry in fs::read_dir(info_dir).unwrap() {
-        let _info = BuildInfo::<MultiCompilerInput, CompilerOutput<Error, Contract>>::read(
-            &entry.unwrap().path(),
-        )
-        .unwrap();
+        let _info =
+            BuildInfo::<SolcInput, CompilerOutput<Error, Contract>>::read(&entry.unwrap().path())
+                .unwrap();
         build_info_count += 1;
     }
     assert_eq!(build_info_count, 1);
@@ -599,11 +592,6 @@ contract B { }
 #[case::solc(MultiCompiler::default())]
 #[case::resolc(resolc())]
 fn can_clean_build_info(#[case] compiler: MultiCompiler) {
-    #[derive(Deserialize)]
-    struct MultiCompilerInput {
-        #[allow(dead_code)]
-        pub input: SolcInput,
-    }
     let mut project = TempProject::<MultiCompiler>::dapptools().unwrap();
     project.project_mut().compiler = compiler;
 
@@ -638,10 +626,9 @@ contract B { }
 
     let mut build_info_count = 0;
     for entry in fs::read_dir(info_dir).unwrap() {
-        let _info = BuildInfo::<MultiCompilerInput, CompilerOutput<Error, Contract>>::read(
-            &entry.unwrap().path(),
-        )
-        .unwrap();
+        let _info =
+            BuildInfo::<SolcInput, CompilerOutput<Error, Contract>>::read(&entry.unwrap().path())
+                .unwrap();
         build_info_count += 1;
     }
     assert_eq!(build_info_count, 1);
@@ -2291,12 +2278,12 @@ library MyLib {
     assert!(bytecode.is_unlinked());
 
     // provide the library settings to let solc link
-    tmp.project_mut().settings.solc.solc.libraries = BTreeMap::from([(
+    tmp.project_mut().settings.solc.libraries = BTreeMap::from([(
         lib,
         BTreeMap::from([("MyLib".to_string(), format!("{:?}", Address::ZERO))]),
     )])
     .into();
-    tmp.project_mut().settings.solc.solc.libraries.slash_paths();
+    tmp.project_mut().settings.solc.libraries.slash_paths();
 
     let compiled = tmp.compile().unwrap();
     compiled.assert_success();
@@ -2308,7 +2295,7 @@ library MyLib {
 
     let libs = Libraries::parse(&[format!("./src/MyLib.sol:MyLib:{:?}", Address::ZERO)]).unwrap();
     // provide the library settings to let solc link
-    tmp.project_mut().settings.solc.solc.libraries =
+    tmp.project_mut().settings.solc.libraries =
         libs.apply(|libs| tmp.paths().apply_lib_remappings(libs));
 
     let compiled = tmp.compile().unwrap();
@@ -2422,9 +2409,9 @@ library MyLib {
 
     let libs =
         Libraries::parse(&[format!("remapping/MyLib.sol:MyLib:{:?}", Address::ZERO)]).unwrap(); // provide the library settings to let solc link
-    tmp.project_mut().settings.solc.solc.libraries =
+    tmp.project_mut().settings.solc.libraries =
         libs.apply(|libs| tmp.paths().apply_lib_remappings(libs));
-    tmp.project_mut().settings.solc.solc.libraries.slash_paths();
+    tmp.project_mut().settings.solc.libraries.slash_paths();
 
     let compiled = tmp.compile().unwrap();
     compiled.assert_success();
@@ -2902,7 +2889,7 @@ fn can_sanitize_bytecode_hash(#[case] compiler: MultiCompiler) {
     let mut tmp = TempProject::<MultiCompiler>::dapptools().unwrap();
     tmp.project_mut().compiler = compiler;
 
-    tmp.project_mut().settings.solc.solc.metadata = Some(BytecodeHash::Ipfs.into());
+    tmp.project_mut().settings.solc.metadata = Some(BytecodeHash::Ipfs.into());
 
     tmp.add_source(
         "A",
@@ -3093,7 +3080,7 @@ fn can_compile_model_checker_sample(#[case] compiler: MultiCompiler) {
     let mut project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
     project.project_mut().compiler = compiler;
 
-    project.project_mut().settings.solc.solc.settings.model_checker = Some(ModelCheckerSettings {
+    project.project_mut().settings.solc.settings.model_checker = Some(ModelCheckerSettings {
         engine: Some(CHC),
         timeout: Some(10000),
         ..Default::default()
@@ -3323,8 +3310,7 @@ fn can_parse_notice(#[case] compiler: MultiCompiler) {
     project.project_mut().compiler = compiler;
 
     project.project_mut().artifacts.additional_values.userdoc = true;
-    project.project_mut().settings.solc.solc.settings =
-        project.project_mut().artifacts.solc_settings();
+    project.project_mut().settings.solc.settings = project.project_mut().artifacts.solc_settings();
 
     let contract = r"
     pragma solidity $VERSION;
@@ -3407,8 +3393,7 @@ fn can_parse_doc(#[case] compiler: MultiCompiler) {
     project.project_mut().compiler = compiler;
     project.project_mut().artifacts.additional_values.userdoc = true;
     project.project_mut().artifacts.additional_values.devdoc = true;
-    project.project_mut().settings.solc.solc.settings =
-        project.project_mut().artifacts.solc_settings();
+    project.project_mut().settings.solc.settings = project.project_mut().artifacts.solc_settings();
 
     let contract = r"
 // SPDX-License-Identifier: GPL-3.0-only
@@ -4024,7 +4009,7 @@ fn can_detect_config_changes(#[case] compiler: MultiCompiler) {
     let compiled = project.compile().unwrap();
     assert!(compiled.is_unchanged());
 
-    project.project_mut().settings.solc.solc.settings.optimizer.enabled = Some(true);
+    project.project_mut().settings.solc.settings.optimizer.enabled = Some(true);
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();
@@ -4431,7 +4416,7 @@ fn test_settings_restrictions(#[case] compiler: MultiCompiler) {
     project.project_mut().compiler = compiler;
 
     // default EVM version is Paris, Cancun contract won't compile
-    project.project_mut().settings.solc.solc.evm_version = Some(EvmVersion::Paris);
+    project.project_mut().settings.solc.evm_version = Some(EvmVersion::Paris);
 
     let common_path = project.add_source("Common.sol", "").unwrap();
 
@@ -4466,7 +4451,7 @@ contract SimpleContract {}
 
     // Add config with Cancun enabled
     let mut cancun_settings = project.project().settings.clone();
-    cancun_settings.solc.solc.evm_version = Some(EvmVersion::Cancun);
+    cancun_settings.solc.evm_version = Some(EvmVersion::Cancun);
     project.project_mut().additional_settings.insert("cancun".to_string(), cancun_settings);
 
     let cancun_restriction = RestrictionsWithVersion {
