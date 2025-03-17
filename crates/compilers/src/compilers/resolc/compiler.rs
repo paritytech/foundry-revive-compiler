@@ -99,7 +99,7 @@ impl Resolc {
         trace!(?output);
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            let version = VersionReq::parse(&stdout.trim()).ok()?;
+            let version = VersionReq::parse(stdout.trim()).ok()?;
             debug!(%version);
             Some(version)
         } else {
