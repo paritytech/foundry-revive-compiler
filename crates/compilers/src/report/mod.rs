@@ -365,7 +365,7 @@ impl Reporter for BasicStdoutReporter {
                 .filter(|str| !str.is_empty())
                 .map(|x| x.trim())
                 .zip(versions)
-                .map(|(name, version)| format!("{name}@{version}"))
+                .map(|(name, version)| format!("{name} v{version}"))
                 .collect::<Vec<_>>()
                 .join(", ");
             println!("Compiling {} files with {}", dirty_files.len(), names);
@@ -389,7 +389,7 @@ impl Reporter for BasicStdoutReporter {
                 .filter(|str| !str.is_empty())
                 .map(|x| x.trim())
                 .zip(versions)
-                .map(|(name, version)| format!("{name}@{version}"))
+                .map(|(name, version)| format!("{name} v{version}"))
                 .collect::<Vec<_>>()
                 .join(", ");
             println!("{names} Finished in {duration:.2?}");
