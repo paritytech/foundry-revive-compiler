@@ -365,7 +365,7 @@ impl Reporter for BasicStdoutReporter {
                 .filter(|str| !str.is_empty())
                 .map(|x| x.trim())
                 .zip(versions)
-                .map(|(name, version)| format!("{}@{}", name, version))
+                .map(|(name, version)| format!("{name}@{version}"))
                 .collect::<Vec<_>>()
                 .join(", ");
             println!("Compiling {} files with {}", dirty_files.len(), names);
@@ -373,7 +373,7 @@ impl Reporter for BasicStdoutReporter {
     }
 
     fn on_compiler_success(&self, compiler_name: &str, version: &Version, duration: &Duration) {
-        println!("{} {} finished in {duration:.2?}", compiler_name, version);
+        println!("{compiler_name} {version} finished in {duration:.2?}");
     }
     fn on_multicompiler_success(
         &self,
@@ -389,10 +389,10 @@ impl Reporter for BasicStdoutReporter {
                 .filter(|str| !str.is_empty())
                 .map(|x| x.trim())
                 .zip(versions)
-                .map(|(name, version)| format!("{}@{}", name, version))
+                .map(|(name, version)| format!("{name}@{version}"))
                 .collect::<Vec<_>>()
                 .join(", ");
-            println!("{} Finished in {duration:.2?}", names);
+            println!("{names} Finished in {duration:.2?}");
         }
     }
 
