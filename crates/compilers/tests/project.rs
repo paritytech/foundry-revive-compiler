@@ -4557,7 +4557,7 @@ fn can_compile_with_right_output(#[case] compiler: MultiCompiler) {
     let compiled = project.compile().unwrap();
     let artifact = compiled.find_first("Dapp").unwrap();
 
-    // Line below should fail as it tests non-hex encoded prefix for the bytecode.
+    // Line below should fail as it tests non-hex encoded bytecode for the hex-encoded prefix.
     // assert!(artifact.bytecode.clone().unwrap().object.as_bytes().unwrap().starts_with(b"505"));
 
     assert!(artifact
