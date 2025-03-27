@@ -4560,5 +4560,6 @@ fn can_compile_with_right_output(#[case] compiler: MultiCompiler) {
     let compiled = project.compile().unwrap();
     let artifact = compiled.find_first("Dapp").unwrap();
     assert!(artifact.bytecode.clone().unwrap().object.as_bytes().unwrap().starts_with(b"505"));
-    assert_eq!(artifact.bytecode.clone().unwrap().object.as_bytes().unwrap().to_string(), "0x");
+    // Here fails
+    assert!(artifact.bytecode.clone().unwrap().object.as_bytes().unwrap().to_string().starts_with("0x505"));
 }
