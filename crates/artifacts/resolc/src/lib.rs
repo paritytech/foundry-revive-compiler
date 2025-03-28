@@ -71,9 +71,9 @@ pub struct ResolcEVM {
 impl From<ResolcEVM> for foundry_compilers_artifacts_solc::Evm {
     fn from(evm: ResolcEVM) -> Self {
         Self {
-            bytecode: evm.bytecode.clone().map(Into::into),
+            bytecode: evm.bytecode.clone(),
             deployed_bytecode: Some(DeployedBytecode {
-                bytecode: evm.deployed_bytecode.or(evm.bytecode).map(Into::into),
+                bytecode: evm.deployed_bytecode.or(evm.bytecode),
                 immutable_references: BTreeMap::new(),
             }),
             method_identifiers: evm.method_identifiers,
