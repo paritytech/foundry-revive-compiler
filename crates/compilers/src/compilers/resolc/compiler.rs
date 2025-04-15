@@ -6,7 +6,8 @@ use crate::{
 };
 use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Contract, Error, SolcLanguage};
 use itertools::Itertools;
-use semver::{Version, VersionReq};
+use rvm::Binary;
+use semver::{Comparator, Prerelease, Version, VersionReq};
 use serde::Serialize;
 use std::{
     io,
@@ -53,7 +54,7 @@ impl Compiler for Resolc {
                     if let Some(req) = &self.supported_solc_versions {
                         req.matches(version)
                     } else {
-                        version.minor >= 8 && version.patch <= 28
+                        true
                     }
                 }
             })
@@ -80,6 +81,112 @@ impl SimpleCompilerName for Resolc {
 }
 
 impl Resolc {
+    pub fn find_or_install(solc_compiler: SolcCompiler) -> Result<Self> {
+        Self::install_version(&VersionReq::STAR, solc_compiler)
+    }
+
+    pub fn find_installed(
+        resolc_version_req: &VersionReq,
+        solc_compiler: SolcCompiler,
+    ) -> Result<Self> {
+        let solc_version = match &solc_compiler {
+            SolcCompiler::Specific(solc) => Some(solc.version_short()),
+            #[cfg(feature = "svm-solc")]
+            SolcCompiler::AutoDetect => None,
+        };
+        let version_manager =
+            rvm::VersionManager::new(true).map_err(|e| SolcError::Message(e.to_string()))?;
+        let available = version_manager
+            .list_available(solc_version)
+            .map_err(|e| SolcError::Message(e.to_string()))?;
+
+        let version = available
+            .iter()
+            .filter(|x| {
+                if resolc_version_req.comparators.is_empty() {
+                    true
+                } else {
+                    resolc_version_req.matches(x.version())
+                }
+            })
+            .filter_map(|x| x.local())
+            .last();
+        if let Some(path) = version {
+            Resolc::new(path, solc_compiler)
+        } else {
+            Err(SolcError::Message(format!(
+                "no resolc versions matching the requirements {} are installed on the system",
+                resolc_version_req
+            )))
+        }
+    }
+
+    pub fn install_version(
+        resolc_version_req: &VersionReq,
+        solc_compiler: SolcCompiler,
+    ) -> Result<Self> {
+        let solc_version = match &solc_compiler {
+            SolcCompiler::Specific(solc) => Some(solc.version_short()),
+            #[cfg(feature = "svm-solc")]
+            SolcCompiler::AutoDetect => None,
+        };
+        let version_manager =
+            rvm::VersionManager::new(false).map_err(|e| SolcError::Message(e.to_string()))?;
+        let versions: Vec<Binary> = version_manager
+            .list_available(solc_version.clone())
+            .map_err(|e| SolcError::Message(e.to_string()))?
+            .into_iter()
+            .filter(|x| {
+                if resolc_version_req.comparators.is_empty() {
+                    true
+                } else {
+                    resolc_version_req.matches(x.version())
+                }
+            })
+            .collect();
+
+        let resolc = versions
+            .iter()
+            .filter(|x| matches!(x, Binary::Local { .. }))
+            .last()
+            .or_else(|| versions.iter().last())
+            .expect("Version list can't be empty");
+
+        let (path, resolc_version, supported_solc_versions) = {
+            let (path, binary_info) = match resolc {
+                Binary::Remote(binary_info) => {
+                    let bin = version_manager
+                        .get_or_install(&binary_info.version, solc_version)
+                        .map_err(|e| SolcError::Message(e.to_string()))?;
+                    (bin.local().expect("should be installed").to_path_buf(), binary_info)
+                }
+                Binary::Local { path, info } => (path.to_owned(), info),
+            };
+            let supported_solc_versions = Some(semver::VersionReq {
+                comparators: vec![
+                    Comparator {
+                        op: semver::Op::GreaterEq,
+                        major: binary_info.first_supported_solc_version.major,
+                        minor: Some(binary_info.first_supported_solc_version.minor),
+                        patch: Some(binary_info.first_supported_solc_version.patch),
+                        pre: Prerelease::default(),
+                    },
+                    Comparator {
+                        op: semver::Op::LessEq,
+                        major: binary_info.last_supported_solc_version.major,
+                        minor: Some(binary_info.last_supported_solc_version.minor),
+                        patch: Some(binary_info.last_supported_solc_version.patch),
+                        pre: Prerelease::default(),
+                    },
+                ],
+            });
+
+            (path, binary_info.version.clone(), supported_solc_versions)
+        };
+
+        Ok(Self { resolc_version, resolc: path, solc: solc_compiler, supported_solc_versions })
+    }
+
     pub fn new(resolc_path: impl Into<PathBuf>, solc_compiler: SolcCompiler) -> Result<Self> {
         let resolc_path = resolc_path.into();
         let resolc_version = Self::get_version_for_path(&resolc_path)?;
