@@ -389,7 +389,7 @@ impl Reporter for BasicStdoutReporter {
                 .filter(|str| !str.is_empty())
                 .map(|x| x.trim())
                 .zip(versions)
-                .map(|(name, version)| format!("{name} v{version}"))
+                .map(|(name, version)| format!("{name} {version}"))
                 .collect::<Vec<_>>()
                 .join(", ");
             println!("{names} finished in {duration:.2?}");

@@ -23,7 +23,7 @@ use super::{ResolcInput, ResolcVersionedInput};
 pub struct Resolc {
     pub resolc: PathBuf,
     pub resolc_version: Version,
-    pub supported_solc_versions: Option<semver::VersionReq>,
+    pub supported_solc_versions: semver::VersionReq,
     pub solc: SolcCompiler,
 }
 
@@ -51,11 +51,7 @@ impl Compiler for Resolc {
             .into_iter()
             .filter(|version| match version {
                 CompilerVersion::Installed(version) | CompilerVersion::Remote(version) => {
-                    if let Some(req) = &self.supported_solc_versions {
-                        req.matches(version)
-                    } else {
-                        true
-                    }
+                    self.supported_solc_versions.matches(version)
                 }
             })
             .collect::<Vec<_>>()
@@ -162,7 +158,7 @@ impl Resolc {
                 }
                 Binary::Local { path, info } => (path.to_owned(), info),
             };
-            let supported_solc_versions = Some(semver::VersionReq {
+            let supported_solc_versions = semver::VersionReq {
                 comparators: vec![
                     Comparator {
                         op: semver::Op::GreaterEq,
@@ -179,7 +175,7 @@ impl Resolc {
                         pre: Prerelease::default(),
                     },
                 ],
-            });
+            };
 
             (path, binary_info.version.clone(), supported_solc_versions)
         };
@@ -190,7 +186,7 @@ impl Resolc {
     pub fn new(resolc_path: impl Into<PathBuf>, solc_compiler: SolcCompiler) -> Result<Self> {
         let resolc_path = resolc_path.into();
         let resolc_version = Self::get_version_for_path(&resolc_path)?;
-        let supported_solc_versions = Self::supported_solc_versions(&resolc_path);
+        let supported_solc_versions = Self::supported_solc_versions(&resolc_path)?;
         Ok(Self {
             resolc_version,
             resolc: resolc_path,
@@ -199,22 +195,24 @@ impl Resolc {
         })
     }
 
-    fn supported_solc_versions(path: &Path) -> Option<semver::VersionReq> {
+    fn supported_solc_versions(path: &Path) -> Result<semver::VersionReq> {
         let mut cmd = Command::new(path);
         cmd.arg("--supported-solc-versions")
             .stdin(Stdio::piped())
             .stderr(Stdio::piped())
             .stdout(Stdio::piped());
         debug!("Getting Resolc supported `solc` versions");
-        let output = cmd.output().ok()?;
+        let output = cmd.output().map_err(map_io_err(&path))?;
         trace!(?output);
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            let version = VersionReq::parse(stdout.trim()).ok()?;
+            let version = VersionReq::parse(stdout.trim())?;
             debug!(%version);
-            Some(version)
+            Ok(version)
         } else {
-            None
+            Err(SolcError::Message(
+                "`resolc` failed to get rang eof supported `solc` versions".to_owned(),
+            ))
         }
     }
 
