@@ -102,9 +102,12 @@ impl Resolc {
 
         let version_manager =
             rvm::VersionManager::new(true).map_err(|e| SolcError::Message(e.to_string()))?;
-        let available = version_manager
-            .list_available(solc_version)
-            .map_err(|e| SolcError::Message(e.to_string()))?;
+        let available = match version_manager.list_available(solc_version) {
+            ok @ Ok(_) => ok,
+            Err(rvm::Error::NoVersionsInstalled) => return Ok(None),
+            err => err,
+        }
+        .map_err(|e| SolcError::Message(e.to_string()))?;
 
         available
             .iter()
