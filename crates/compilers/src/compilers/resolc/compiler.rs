@@ -110,8 +110,8 @@ impl Resolc {
             .iter()
             .filter(|x| x.version() == resolc_version)
             .filter_map(|x| x.local())
-            .last()
-            .map(|path| Resolc::new(path, solc_compiler))
+            .next_back()
+            .map(|path| Self::new(path, solc_compiler))
             .transpose()
     }
 
@@ -142,7 +142,7 @@ impl Resolc {
         let binary_info = versions
             .iter()
             .filter(|x| matches!(x, Binary::Remote { .. }))
-            .last()
+            .next_back()
             .or_else(|| versions.iter().last())
             .map(|binary| match binary {
                 Binary::Remote(binary_info) => binary_info,
@@ -189,7 +189,7 @@ impl Resolc {
             .stderr(Stdio::piped())
             .stdout(Stdio::piped());
         debug!("Getting Resolc supported `solc` versions");
-        let output = cmd.output().map_err(map_io_err(&path))?;
+        let output = cmd.output().map_err(map_io_err(path))?;
         trace!(?output);
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
