@@ -62,6 +62,7 @@ impl Compiler for Resolc {
         input: &Self::Input,
     ) -> Result<crate::compilers::CompilerOutput<Error, Self::CompilerContract>, SolcError> {
         let solc = self.solc(input)?;
+
         let results = self.compile_output::<ResolcInput>(&solc, &input.input)?;
         let output = std::str::from_utf8(&results).map_err(|_| SolcError::InvalidUtf8)?;
         let results: ResolcCompilerOutput =
@@ -77,50 +78,52 @@ impl SimpleCompilerName for Resolc {
 }
 
 impl Resolc {
-    pub fn find_or_install(solc_compiler: SolcCompiler) -> Result<Self> {
-        Self::install_version(&VersionReq::STAR, solc_compiler)
+    pub fn new(resolc_path: impl Into<PathBuf>, solc_compiler: SolcCompiler) -> Result<Self> {
+        let resolc_path = resolc_path.into();
+        let resolc_version = Self::get_version_for_path(&resolc_path)?;
+        let supported_solc_versions = Self::supported_solc_versions(&resolc_path)?;
+        Ok(Self {
+            resolc_version,
+            resolc: resolc_path,
+            solc: solc_compiler,
+            supported_solc_versions,
+        })
     }
 
     pub fn find_installed(
-        resolc_version_req: &VersionReq,
+        resolc_version: &Version,
         solc_compiler: SolcCompiler,
-    ) -> Result<Self> {
+    ) -> Result<Option<Self>> {
         let solc_version = match &solc_compiler {
             SolcCompiler::Specific(solc) => Some(solc.version_short()),
             #[cfg(feature = "svm-solc")]
             SolcCompiler::AutoDetect => None,
         };
+
         let version_manager =
             rvm::VersionManager::new(true).map_err(|e| SolcError::Message(e.to_string()))?;
         let available = version_manager
             .list_available(solc_version)
             .map_err(|e| SolcError::Message(e.to_string()))?;
 
-        let version = available
+        available
             .iter()
-            .filter(|x| {
-                if resolc_version_req.comparators.is_empty() {
-                    true
-                } else {
-                    resolc_version_req.matches(x.version())
-                }
-            })
+            .filter(|x| x.version() == resolc_version)
             .filter_map(|x| x.local())
-            .last();
-        if let Some(path) = version {
-            Resolc::new(path, solc_compiler)
+            .last()
+            .map(|path| Resolc::new(path, solc_compiler))
+            .transpose()
+    }
+
+    pub fn find_or_install(resolc_version: &Version, solc_compiler: SolcCompiler) -> Result<Self> {
+        if let Some(resolc) = Self::find_installed(resolc_version, solc_compiler.clone())? {
+            Ok(resolc)
         } else {
-            Err(SolcError::Message(format!(
-                "no resolc versions matching the requirements {} are installed on the system",
-                resolc_version_req
-            )))
+            Self::install(Some(resolc_version), solc_compiler)
         }
     }
 
-    pub fn install_version(
-        resolc_version_req: &VersionReq,
-        solc_compiler: SolcCompiler,
-    ) -> Result<Self> {
+    pub fn install(resolc_version: Option<&Version>, solc_compiler: SolcCompiler) -> Result<Self> {
         let solc_version = match &solc_compiler {
             SolcCompiler::Specific(solc) => Some(solc.version_short()),
             #[cfg(feature = "svm-solc")]
@@ -128,35 +131,31 @@ impl Resolc {
         };
         let version_manager =
             rvm::VersionManager::new(false).map_err(|e| SolcError::Message(e.to_string()))?;
+
         let versions: Vec<Binary> = version_manager
             .list_available(solc_version.clone())
             .map_err(|e| SolcError::Message(e.to_string()))?
             .into_iter()
-            .filter(|x| {
-                if resolc_version_req.comparators.is_empty() {
-                    true
-                } else {
-                    resolc_version_req.matches(x.version())
-                }
-            })
+            .filter(|x| resolc_version.is_none_or(|version| version == x.version()))
             .collect();
 
-        let resolc = versions
+        let binary_info = versions
             .iter()
-            .filter(|x| matches!(x, Binary::Local { .. }))
+            .filter(|x| matches!(x, Binary::Remote { .. }))
             .last()
             .or_else(|| versions.iter().last())
+            .map(|binary| match binary {
+                Binary::Remote(binary_info) => binary_info,
+                Binary::Local { .. } => panic!("Can't happen"),
+            })
             .expect("Version list can't be empty");
 
         let (path, resolc_version, supported_solc_versions) = {
-            let (path, binary_info) = match resolc {
-                Binary::Remote(binary_info) => {
-                    let bin = version_manager
-                        .get_or_install(&binary_info.version, solc_version)
-                        .map_err(|e| SolcError::Message(e.to_string()))?;
-                    (bin.local().expect("should be installed").to_path_buf(), binary_info)
-                }
-                Binary::Local { path, info } => (path.to_owned(), info),
+            let (path, binary_info) = {
+                let bin = version_manager
+                    .get_or_install(&binary_info.version, solc_version)
+                    .map_err(|e| SolcError::Message(e.to_string()))?;
+                (bin.local().expect("should be installed").to_path_buf(), binary_info)
             };
             let supported_solc_versions = semver::VersionReq {
                 comparators: vec![
@@ -183,18 +182,6 @@ impl Resolc {
         Ok(Self { resolc_version, resolc: path, solc: solc_compiler, supported_solc_versions })
     }
 
-    pub fn new(resolc_path: impl Into<PathBuf>, solc_compiler: SolcCompiler) -> Result<Self> {
-        let resolc_path = resolc_path.into();
-        let resolc_version = Self::get_version_for_path(&resolc_path)?;
-        let supported_solc_versions = Self::supported_solc_versions(&resolc_path)?;
-        Ok(Self {
-            resolc_version,
-            resolc: resolc_path,
-            solc: solc_compiler,
-            supported_solc_versions,
-        })
-    }
-
     fn supported_solc_versions(path: &Path) -> Result<semver::VersionReq> {
         let mut cmd = Command::new(path);
         cmd.arg("--supported-solc-versions")
@@ -216,15 +203,22 @@ impl Resolc {
         }
     }
 
-    fn solc(&self, _input: &ResolcVersionedInput) -> Result<Solc> {
-        let solc = match &self.solc {
-            SolcCompiler::Specific(solc) => solc.clone(),
+    pub(crate) fn solc(&self, _input: &ResolcVersionedInput) -> Result<Solc> {
+        match &self.solc {
+            SolcCompiler::Specific(solc) => Ok(solc.clone()),
 
             #[cfg(feature = "svm-solc")]
-            SolcCompiler::AutoDetect => Solc::find_or_install(&_input.solc_version)?,
-        };
-
-        Ok(solc)
+            SolcCompiler::AutoDetect => {
+                if self.supported_solc_versions.matches(&_input.solc_version) {
+                    Solc::find_or_install(&_input.solc_version)
+                } else {
+                    Err(SolcError::Message(format!(
+                        "autodetected `solc` version v{} is not supported by `resolc` v{}. Set explicit `solc` version",
+                        &_input.solc_version, self.resolc_version
+                    )))
+                }
+            }
+        }
     }
 
     pub fn get_version_for_path(path: &Path) -> Result<Version> {

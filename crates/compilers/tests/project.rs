@@ -111,7 +111,7 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
 
             take_solc_installer_lock!(_lock);
 
-            tokio::task::block_in_place(|| Resolc::find_or_install(solc).unwrap())
+            tokio::task::block_in_place(|| Resolc::install(None, solc).unwrap())
         })
     }
 });
