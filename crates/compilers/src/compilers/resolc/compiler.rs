@@ -144,6 +144,7 @@ impl Resolc {
             .filter(|x| matches!(x, Binary::Remote { .. }))
             .next_back()
             .or_else(|| versions.iter().last())
+            .filter(|x| matches!(x, Binary::Remote { .. }))
             .map(|binary| match binary {
                 Binary::Remote(binary_info) => binary_info,
                 Binary::Local { .. } => panic!("Can't happen"),
