@@ -167,7 +167,7 @@ impl Resolc {
                 };
                 return Ok(Self {
                     resolc_version: info.version,
-                    resolc: path.to_path_buf(),
+                    resolc: path,
                     solc: solc_compiler,
                     supported_solc_versions,
                 });
@@ -200,7 +200,7 @@ impl Resolc {
                 ],
             };
 
-            (path, binary_info.version.clone(), supported_solc_versions)
+            (path, binary_info.version, supported_solc_versions)
         };
 
         Ok(Self { resolc_version, resolc: path, solc: solc_compiler, supported_solc_versions })
