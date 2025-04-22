@@ -142,17 +142,37 @@ impl Resolc {
             .filter(|x| resolc_version.is_none_or(|version| version == x.version()))
             .collect();
 
-        let binary_info = versions
-            .iter()
-            .filter(|x| matches!(x, Binary::Remote { .. }))
-            .next_back()
-            .or_else(|| versions.iter().last())
-            .filter(|x| matches!(x, Binary::Remote { .. }))
-            .map(|binary| match binary {
-                Binary::Remote(binary_info) => binary_info,
-                Binary::Local { .. } => panic!("Can't happen"),
-            })
-            .expect("Version list can't be empty");
+        let binary = versions.into_iter().next_back().expect("Can't be empty");
+
+        let binary_info = match binary {
+            Binary::Remote(binary_info) => binary_info,
+            Binary::Local { path, info } => {
+                let supported_solc_versions = semver::VersionReq {
+                    comparators: vec![
+                        Comparator {
+                            op: semver::Op::GreaterEq,
+                            major: info.first_supported_solc_version.major,
+                            minor: Some(info.first_supported_solc_version.minor),
+                            patch: Some(info.first_supported_solc_version.patch),
+                            pre: Prerelease::default(),
+                        },
+                        Comparator {
+                            op: semver::Op::LessEq,
+                            major: info.last_supported_solc_version.major,
+                            minor: Some(info.last_supported_solc_version.minor),
+                            patch: Some(info.last_supported_solc_version.patch),
+                            pre: Prerelease::default(),
+                        },
+                    ],
+                };
+                return Ok(Self {
+                    resolc_version: info.version,
+                    resolc: path.to_path_buf(),
+                    solc: solc_compiler,
+                    supported_solc_versions,
+                });
+            }
+        };
 
         let (path, resolc_version, supported_solc_versions) = {
             let (path, binary_info) = {
