@@ -91,7 +91,7 @@ impl Resolc {
     }
 
     pub fn find_installed(
-        resolc_version: &Version,
+        resolc_version: Option<&Version>,
         solc_compiler: SolcCompiler,
     ) -> Result<Option<Self>> {
         let solc_version = match &solc_compiler {
@@ -111,7 +111,7 @@ impl Resolc {
 
         available
             .iter()
-            .filter(|x| x.version() == resolc_version)
+            .filter(|x| resolc_version.is_none_or(|version| version == x.version()))
             .filter_map(|x| x.local())
             .next_back()
             .map(|path| Self::new(path, solc_compiler))
@@ -119,7 +119,7 @@ impl Resolc {
     }
 
     pub fn find_or_install(resolc_version: &Version, solc_compiler: SolcCompiler) -> Result<Self> {
-        if let Some(resolc) = Self::find_installed(resolc_version, solc_compiler.clone())? {
+        if let Some(resolc) = Self::find_installed(Some(resolc_version), solc_compiler.clone())? {
             Ok(resolc)
         } else {
             Self::install(Some(resolc_version), solc_compiler)
