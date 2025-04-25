@@ -134,8 +134,8 @@ impl Resolc {
         };
         #[cfg(any(feature = "async", feature = "svm-solc"))]
         return foundry_compilers_core::utils::RuntimeOrHandle::new().block_on(async {
-            // rvm uses reqwest::blocking internally and so it's needed to wrap the calls in tokio::task::block_on or spawn_blocking to avoid panics
-            // Refer to: https://github.com/seanmonstar/reqwest/issues/1017
+            // rvm uses reqwest::blocking internally and so it's needed to wrap the calls in
+            // tokio::task::block_on or spawn_blocking to avoid panics Refer to: https://github.com/seanmonstar/reqwest/issues/1017
             tokio::task::block_in_place(|| {
                 let version_manager = rvm::VersionManager::new(false)
                     .map_err(|e| SolcError::Message(e.to_string()))?;
