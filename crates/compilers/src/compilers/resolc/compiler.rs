@@ -217,74 +217,76 @@ impl Resolc {
             })
         });
 
-        let version_manager =
-            rvm::VersionManager::new(true).map_err(|e| SolcError::Message(e.to_string()))?;
+        #[cfg(not(any(feature = "async", feature = "svm-solc")))]
+        {
+            let version_manager =
+                rvm::VersionManager::new(true).map_err(|e| SolcError::Message(e.to_string()))?;
 
-        let versions: Vec<Binary> = version_manager
-            .list_available(_solc_version.clone())
-            .map_err(|e| SolcError::Message(e.to_string()))?
-            .into_iter()
-            .filter(|x| _resolc_version.is_none_or(|version| version == x.version()))
-            .collect();
+            let versions: Vec<Binary> = version_manager
+                .list_available(_solc_version.clone())
+                .map_err(|e| SolcError::Message(e.to_string()))?
+                .into_iter()
+                .filter(|x| _resolc_version.is_none_or(|version| version == x.version()))
+                .collect();
 
-        let binary = versions.into_iter().next_back();
+            let binary = versions.into_iter().next_back();
 
-        if let Some(binary) = binary {
-            match binary {
-                Binary::Local { path, info } => {
-                    let supported_solc_versions = semver::VersionReq {
-                        comparators: vec![
-                            Comparator {
-                                op: semver::Op::GreaterEq,
-                                major: info.first_supported_solc_version.major,
-                                minor: Some(info.first_supported_solc_version.minor),
-                                patch: Some(info.first_supported_solc_version.patch),
-                                pre: Prerelease::default(),
-                            },
-                            Comparator {
-                                op: semver::Op::LessEq,
-                                major: info.last_supported_solc_version.major,
-                                minor: Some(info.last_supported_solc_version.minor),
-                                patch: Some(info.last_supported_solc_version.patch),
-                                pre: Prerelease::default(),
-                            },
-                        ],
-                    };
-                    Ok(Self {
-                        resolc_version: info.version,
-                        resolc: path,
-                        solc: solc_compiler,
-                        supported_solc_versions,
-                    })
-                }
-                Binary::Remote(_) => {
-                    panic!("Can't happen in offline mode")
-                }
-            }
-        } else {
-             Err(SolcError::Message("No resolc versions available".to_owned()))
+            if let Some(binary) = binary {
+                match binary {
+                    Binary::Local { path, info } => {
+                        let supported_solc_versions = semver::VersionReq {
+                            comparators: vec![
+                                Comparator {
+                                    op: semver::Op::GreaterEq,
+                                    major: info.first_supported_solc_version.major,
+                                    minor: Some(info.first_supported_solc_version.minor),
+                                    patch: Some(info.first_supported_solc_version.patch),
+                                    pre: Prerelease::default(),
+                                },
+                                Comparator {
+                                    op: semver::Op::LessEq,
+                                    major: info.last_supported_solc_version.major,
+                                    minor: Some(info.last_supported_solc_version.minor),
+                                    patch: Some(info.last_supported_solc_version.patch),
+                                    pre: Prerelease::default(),
+                                },
+                            ],
+                        };
+                        return Ok(Self {
+                            resolc_version: info.version,
+                            resolc: path,
+                            solc: solc_compiler,
+                            supported_solc_versions,
+                        });
+                    }
+                    Binary::Remote(_) => {
+                        panic!("Can't happen in offline mode")
+                    }
+                };
+            };
+
+            Err(SolcError::Message("No resolc versions available".to_owned()))
         }
     }
 
-        fn supported_solc_versions(path: &Path) -> Result<semver::VersionReq> {
-            let mut cmd = Command::new(path);
-            cmd.arg("--supported-solc-versions")
-                .stdin(Stdio::piped())
-                .stderr(Stdio::piped())
-                .stdout(Stdio::piped());
-            debug!("Getting Resolc supported `solc` versions");
-            let output = cmd.output().map_err(map_io_err(path))?;
-            trace!(?output);
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let version = VersionReq::parse(stdout.trim())?;
-                debug!(%version);
-                Ok(version)
-            } else {
-                Err(SolcError::Message(
-                    "`resolc` failed to get rang eof supported `solc` versions".to_owned(),
-                ))
-            }
+    fn supported_solc_versions(path: &Path) -> Result<semver::VersionReq> {
+        let mut cmd = Command::new(path);
+        cmd.arg("--supported-solc-versions")
+            .stdin(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped());
+        debug!("Getting Resolc supported `solc` versions");
+        let output = cmd.output().map_err(map_io_err(path))?;
+        trace!(?output);
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let version = VersionReq::parse(stdout.trim())?;
+            debug!(%version);
+            Ok(version)
+        } else {
+            Err(SolcError::Message(
+                "`resolc` failed to get rang eof supported `solc` versions".to_owned(),
+            ))
         }
     }
 
