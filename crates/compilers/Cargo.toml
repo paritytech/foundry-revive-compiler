@@ -91,6 +91,7 @@ async = [
     "tokio/process",
     "tokio/io-util",
     "foundry-compilers-artifacts/async",
+    "foundry-compilers-core/async",
 ]
 # Enables `svm` to auto-detect and manage `solc` builds.
 svm-solc = [
