@@ -59,6 +59,7 @@ sha2 = { version = "0.10", default-features = false, optional = true }
 # rvm
 rvm = { workspace = true, default-features = false }
 
+
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", default-features = false, features = [
     "env-filter",
@@ -96,6 +97,7 @@ svm-solc = [
     "dep:svm",
     "dep:svm-builds",
     "dep:sha2",
+    "dep:tokio",
     "foundry-compilers-core/svm-solc",
 ]
 # Utilities for creating and testing project workspaces.

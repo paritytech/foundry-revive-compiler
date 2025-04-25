@@ -132,7 +132,7 @@ impl Resolc {
             #[cfg(feature = "svm-solc")]
             SolcCompiler::AutoDetect => None,
         };
-        #[cfg(any(feature = "svm-solc", feature = "async"))]
+        #[cfg(any(feature = "async", feature = "svm-solc"))]
         return crate::utils::RuntimeOrHandle::new().block_on(async {
             tokio::task::block_in_place(|| {
                 let version_manager = rvm::VersionManager::new(false)
@@ -214,8 +214,7 @@ impl Resolc {
                 })
             })
         });
-
-        #[cfg(not(any(feature = "svm-solc", feature = "async")))]
+        #[cfg(not(any(feature = "async", feature = "svm-solc")))]
         Err(SolcError::Message("features async or svm-solc are not enabled".to_owned()))
     }
 
