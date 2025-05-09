@@ -1159,7 +1159,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "walkdir",
  "winnow",
  "yansi",
  "zip",

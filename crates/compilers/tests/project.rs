@@ -4532,7 +4532,8 @@ fn test_output_hash_cache_invalidation() {
     // Set up test project using dapp-sample test data.
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
     let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
-    let project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
+    let mut project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
+    project.project_mut().build_info = true;
 
     // First compilation - should compile everything since cache is empty.
     let compiled = project.compile().unwrap();
@@ -4544,19 +4545,29 @@ fn test_output_hash_cache_invalidation() {
     compiled.assert_success();
     assert!(compiled.is_unchanged(), "Second compilation should use cache");
 
-    // Modify output directory by adding a new file.
-    // This should invalidate the cache since output hash will change.
+    // Adding a file to output directory should NOT invalidate cache
     let artifacts_path = project.project().artifacts_path();
     let new_file = artifacts_path.join("test.json");
     fs::write(&new_file, "{}").unwrap();
 
-    // Third compilation - should recompile since output directory changed.
     let compiled = project.compile().unwrap();
     compiled.assert_success();
-    assert!(!compiled.is_unchanged(), "Cache should be invalidated after output dir changes");
+    assert!(compiled.is_unchanged(), "Cache should remain valid when only output directory changes");
 
-    // Clean up test file.
+    // Modify source to trigger new build info
+    let new_contract_path = project.sources_path().join("NewContract.sol");
+    fs::write(&new_contract_path, r#"
+        pragma solidity ^0.8.10;
+        contract NewContract {}
+    "#).unwrap();
+
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(!compiled.is_unchanged(), "Cache should be invalidated when build info changes");
+
+    // Clean up test files
     fs::remove_file(new_file).unwrap();
+    fs::remove_file(new_contract_path).unwrap();
 }
 
 #[test]
@@ -4564,7 +4575,8 @@ fn test_output_hash_concurrent_modifications() {
     // Set up test project.
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
     let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
-    let project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
+    let mut project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
+    project.project_mut().build_info = true;
 
     // Initial compilation to establish baseline.
     let compiled = project.compile().unwrap();
@@ -4587,7 +4599,7 @@ fn test_output_hash_concurrent_modifications() {
     // This tests that the cache system properly handles concurrent modifications.
     let compiled = project.compile().unwrap();
     compiled.assert_success();
-    assert!(!compiled.is_unchanged(), "Should detect changes in output directory");
+    assert!(compiled.is_unchanged(), "Cache should remain valid during output directory changes");
 
     // Wait for background task to complete and clean up.
     handle.join().unwrap();

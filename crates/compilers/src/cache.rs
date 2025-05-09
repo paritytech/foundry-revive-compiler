@@ -16,17 +16,14 @@ use foundry_compilers_core::{
     error::{Result, SolcError},
     utils::{self, strip_prefix},
 };
-use md5::{Digest, Md5};
 use semver::Version;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::{btree_map::BTreeMap, hash_map, BTreeSet, HashMap, HashSet},
     fs,
-    io::{Read, Result as IoResult},
     path::{Path, PathBuf},
     time::{Duration, UNIX_EPOCH},
 };
-use walkdir::WalkDir;
 
 mod iface;
 use iface::interface_repr_hash;
@@ -53,8 +50,6 @@ pub struct CompilerCache<S = Settings> {
     pub profiles: BTreeMap<String, S>,
     pub preprocessed: bool,
     pub mocks: HashSet<PathBuf>,
-    /// Hash of the output directory (e.g., `resolc-out/`).
-    pub output_hash: Option<String>,
 }
 
 impl<S> CompilerCache<S> {
@@ -67,7 +62,6 @@ impl<S> CompilerCache<S> {
             profiles: Default::default(),
             preprocessed,
             mocks: Default::default(),
-            output_hash: Default::default(),
         }
     }
 }
@@ -182,6 +176,19 @@ impl<S: CompilerSettings> CompilerCache<S> {
             self.builds.remove(&build_id);
             let path = self.paths.build_infos.join(build_id).with_extension("json");
             let _ = std::fs::remove_file(path);
+        }
+
+        if let Ok(dir) = std::fs::read_dir(&self.paths.build_infos) {
+            for build_id in dir
+                .filter_map(|x| x.ok())
+                .filter(|f| f.path().extension().is_some_and(|f| f == "json") && f.path().is_file())
+            {
+                if !self.builds.contains(
+                    build_id.file_name().to_string_lossy().trim_end_matches(".json"),
+                ) {
+                    let _ = std::fs::remove_file(build_id.path());
+                }
+            }
         }
     }
 
@@ -389,7 +396,6 @@ impl<S> Default for CompilerCache<S> {
             profiles: Default::default(),
             preprocessed: false,
             mocks: Default::default(),
-            output_hash: Default::default(),
         }
     }
 }
@@ -1043,25 +1049,7 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             if !invalidate_cache && project.cache_path().exists() {
                 if let Ok(cache) = CompilerCache::read_joined(&project.paths) {
                     if cache.paths == paths && preprocessed == cache.preprocessed {
-                        // Check if output/ directory content changed.
-                        let actual_output_hash = ArtifactsCache::<T, C>::hash_directory(project.artifacts_path()).ok();
-                        let cached_output_hash = cache.output_hash.clone();
-
-                        // Consider it a mismatch if:
-                        // - both hashes exist but differ;
-                        // - only one hash exists (indicating partial state);
-                        // - neither hash exists (first run).
-                        let hash_mismatch = match (&actual_output_hash, &cached_output_hash) {
-                            (Some(current), Some(cached)) => current != cached,
-                            (Some(_), None) | (None, Some(_)) => true,
-                            (None, None) => false,
-                        };
-
-                        if !hash_mismatch {
-                            return cache;
-                        }
-
-                        trace!("{:?} directory content changed, creating new cache.", project.artifacts_path());
+                        return cache;
                     }
                 }
             }
@@ -1259,8 +1247,6 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             cache.builds.insert(build_info.id.clone());
         }
 
-        cache.output_hash = ArtifactsCache::<T, C>::hash_directory(project.artifacts_path()).ok();
-
         // write to disk
         if write_to_disk {
             cache.remove_outdated_builds();
@@ -1283,31 +1269,5 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
                 entry.seen_by_compiler = true;
             }
         }
-    }
-
-    /// Hashes the contents of a directory.
-    fn hash_directory<P: AsRef<Path>>(directory: P) -> IoResult<String> {
-        let mut entries: Vec<_> = WalkDir::new(directory)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-            .collect();
-
-        // Sort by path for deterministic hash.
-        entries.sort_by_key(|e| e.path().to_path_buf());
-
-        let mut hasher = Md5::new();
-        let mut buffer = Vec::new();
-
-        for entry in entries {
-            buffer.clear();
-
-            let mut file = fs::File::open(entry.path())?;
-            file.read_to_end(&mut buffer)?;
-
-            hasher.update(&buffer);
-        }
-
-        Ok(format!("{:x}", hasher.finalize()))
     }
 }
