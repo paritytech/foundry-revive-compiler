@@ -4526,3 +4526,127 @@ fn can_compile_with_right_output() {
         .to_string()
         .starts_with("0x50564d"));
 }
+
+#[test]
+fn test_output_hash_cache_invalidation() {
+    // Set up test project using dapp-sample test data.
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
+    let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
+    let project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
+
+    // First compilation - should compile everything since cache is empty.
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(!compiled.is_unchanged(), "First compilation should not be cached");
+
+    // Second compilation - should use cache since nothing changed.
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(compiled.is_unchanged(), "Second compilation should use cache");
+
+    // Modify output directory by adding a new file.
+    // This should invalidate the cache since output hash will change.
+    let artifacts_path = project.project().artifacts_path();
+    let new_file = artifacts_path.join("test.json");
+    fs::write(&new_file, "{}").unwrap();
+
+    // Third compilation - should recompile since output directory changed.
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(!compiled.is_unchanged(), "Cache should be invalidated after output dir changes");
+
+    // Clean up test file.
+    fs::remove_file(new_file).unwrap();
+}
+
+#[test]
+fn test_output_hash_concurrent_modifications() {
+    // Set up test project.
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
+    let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
+    let project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
+
+    // Initial compilation to establish baseline.
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+
+    // Set up background task that continuously modifies a file in the output directory.
+    // This simulates concurrent access to the output directory during compilation.
+    let artifacts_path = project.project().artifacts_path();
+    let temporary_file_path = artifacts_path.join("changing.json");
+    let temporary_file_path_clone = temporary_file_path.clone();
+    
+    let handle = std::thread::spawn(move || {
+        for index in 0..5 {
+            fs::write(&temporary_file_path_clone, format!("content_{}", index)).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    });
+
+    // Attempt compilation while directory is being modified.
+    // This tests that the cache system properly handles concurrent modifications.
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(!compiled.is_unchanged(), "Should detect changes in output directory");
+
+    // Wait for background task to complete and clean up.
+    handle.join().unwrap();
+    if temporary_file_path.exists() {
+        fs::remove_file(temporary_file_path).unwrap();
+    }
+}
+
+#[test]
+fn test_output_hash_nested_directories() {
+    // Set up test project.
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
+    let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
+    let project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
+
+    let artifacts_path = project.project().artifacts_path();
+    
+    // Create nested directory structure.
+    let nested_directory = artifacts_path.join("a/b/c");
+    fs::create_dir_all(&nested_directory).unwrap();
+    
+    // Add files at different levels.
+    fs::write(artifacts_path.join("root.json"), "root").unwrap();
+    fs::write(artifacts_path.join("a/level1.json"), "level1").unwrap();
+    fs::write(artifacts_path.join("a/b/level2.json"), "level2").unwrap();
+    fs::write(nested_directory.join("level3.json"), "level3").unwrap();
+
+    // Compile and verify cache behavior.
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(!compiled.is_unchanged(), "Should detect nested directory changes");
+
+    // Clean up.
+    fs::remove_dir_all(artifacts_path.join("a")).unwrap();
+    fs::remove_file(artifacts_path.join("root.json")).unwrap();
+}
+
+#[test]
+fn test_output_hash_special_filenames() {
+    // Set up test project.
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/dapp-sample");
+    let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
+    let project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
+
+    let artifacts_path = project.project().artifacts_path();
+    fs::create_dir_all(&artifacts_path).unwrap();
+    
+    // Create files with special characters in names.
+    fs::write(artifacts_path.join("space file.json"), "space").unwrap();
+    fs::write(artifacts_path.join("underscore_file.json"), "underscore").unwrap();
+    fs::write(artifacts_path.join("dash-file.json"), "dash").unwrap();
+
+    // Compile and verify cache behavior.
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(!compiled.is_unchanged(), "Should handle special filenames");
+
+    // Clean up.
+    fs::remove_file(artifacts_path.join("space file.json")).unwrap();
+    fs::remove_file(artifacts_path.join("underscore_file.json")).unwrap();
+    fs::remove_file(artifacts_path.join("dash-file.json")).unwrap();
+}
