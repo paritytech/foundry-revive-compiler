@@ -4578,7 +4578,7 @@ fn test_output_hash_concurrent_modifications() {
 
     let handle = std::thread::spawn(move || {
         for index in 0..5 {
-            fs::write(&temporary_file_path_clone, format!("content_{}", index)).unwrap();
+            fs::write(&temporary_file_path_clone, format!("content_{index}")).unwrap();
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
     });
@@ -4633,7 +4633,7 @@ fn test_output_hash_special_filenames() {
     let project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
 
     let artifacts_path = project.project().artifacts_path();
-    fs::create_dir_all(&artifacts_path).unwrap();
+    fs::create_dir_all(artifacts_path).unwrap();
 
     // Create files with special characters in names.
     fs::write(artifacts_path.join("space file.json"), "space").unwrap();
