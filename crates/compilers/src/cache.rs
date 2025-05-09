@@ -1043,8 +1043,25 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             if !invalidate_cache && project.cache_path().exists() {
                 if let Ok(cache) = CompilerCache::read_joined(&project.paths) {
                     if cache.paths == paths && preprocessed == cache.preprocessed {
-                        // unchanged project paths and same preprocess cache option
-                        return cache;
+                        // Check if output/ directory content changed.
+                        let actual_output_hash = ArtifactsCache::<T, C>::hash_directory(project.artifacts_path()).ok();
+                        let cached_output_hash = cache.output_hash.clone();
+
+                        // Consider it a mismatch if:
+                        // - both hashes exist but differ;
+                        // - only one hash exists (indicating partial state);
+                        // - neither hash exists (first run).
+                        let hash_mismatch = match (&actual_output_hash, &cached_output_hash) {
+                            (Some(current), Some(cached)) => current != cached,
+                            (Some(_), None) | (None, Some(_)) => true,
+                            (None, None) => false,
+                        };
+
+                        if !hash_mismatch {
+                            return cache;
+                        }
+
+                        trace!("{:?} directory content changed, creating new cache.", project.artifacts_path());
                     }
                 }
             }
@@ -1061,27 +1078,6 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
 
             // read the cache file if it already exists
             let mut cache = get_cache(project, invalidate_cache, preprocessed);
-
-            // Compare output directory hash with cached hash to detect changes.
-            let actual_output_hash = Self::hash_directory(project.artifacts_path()).ok();
-            let cached_output_hash = cache.output_hash.clone();
-
-            // Consider it a mismatch if:
-            // - both hashes exist but differ;
-            // - only one hash exists (indicating partial state);
-            // - neither hash exists (first run).
-            let hash_mismatch = match (&actual_output_hash, &cached_output_hash) {
-                (Some(current), Some(cached)) => current != cached,
-                (Some(_), None) | (None, Some(_)) => true,
-                (None, None) => false,
-            };
-
-            if hash_mismatch {
-                // Clear cache to force full recompilation when output directory content changes.
-                cache.files.clear();
-
-                trace!("Output directory content changed, forcing full recompilation");
-            }
 
             cache.remove_missing_files();
 
@@ -1263,6 +1259,8 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             cache.builds.insert(build_info.id.clone());
         }
 
+        cache.output_hash = ArtifactsCache::<T, C>::hash_directory(project.artifacts_path()).ok();
+
         // write to disk
         if write_to_disk {
             cache.remove_outdated_builds();
@@ -1271,8 +1269,6 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             cache
                 .strip_entries_prefix(project.root())
                 .strip_artifact_files_prefixes(project.artifacts_path());
-
-            cache.output_hash = Self::hash_directory(project.artifacts_path()).ok();
 
             cache.write(project.cache_path())?;
         }
@@ -1290,7 +1286,7 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
     }
 
     /// Hashes the contents of a directory.
-    pub fn hash_directory<P: AsRef<Path>>(directory: P) -> IoResult<String> {
+    fn hash_directory<P: AsRef<Path>>(directory: P) -> IoResult<String> {
         let mut entries: Vec<_> = WalkDir::new(directory)
             .into_iter()
             .filter_map(|e| e.ok())
