@@ -1049,6 +1049,7 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             if !invalidate_cache && project.cache_path().exists() {
                 if let Ok(cache) = CompilerCache::read_joined(&project.paths) {
                     if cache.paths == paths && preprocessed == cache.preprocessed {
+                        // unchanged project paths and same preprocess cache option
                         return cache;
                     }
                 }
@@ -1255,7 +1256,6 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             cache
                 .strip_entries_prefix(project.root())
                 .strip_artifact_files_prefixes(project.artifacts_path());
-
             cache.write(project.cache_path())?;
         }
 
