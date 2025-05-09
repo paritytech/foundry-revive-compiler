@@ -4552,14 +4552,21 @@ fn test_output_hash_cache_invalidation() {
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();
-    assert!(compiled.is_unchanged(), "Cache should remain valid when only output directory changes");
+    assert!(
+        compiled.is_unchanged(),
+        "Cache should remain valid when only output directory changes"
+    );
 
     // Modify source to trigger new build info
     let new_contract_path = project.sources_path().join("NewContract.sol");
-    fs::write(&new_contract_path, r#"
+    fs::write(
+        &new_contract_path,
+        r#"
         pragma solidity ^0.8.10;
         contract NewContract {}
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();

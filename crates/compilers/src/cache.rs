@@ -183,9 +183,10 @@ impl<S: CompilerSettings> CompilerCache<S> {
                 .filter_map(|x| x.ok())
                 .filter(|f| f.path().extension().is_some_and(|f| f == "json") && f.path().is_file())
             {
-                if !self.builds.contains(
-                    build_id.file_name().to_string_lossy().trim_end_matches(".json"),
-                ) {
+                if !self
+                    .builds
+                    .contains(build_id.file_name().to_string_lossy().trim_end_matches(".json"))
+                {
                     let _ = std::fs::remove_file(build_id.path());
                 }
             }
