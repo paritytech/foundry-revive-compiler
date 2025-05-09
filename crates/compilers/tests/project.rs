@@ -4575,7 +4575,7 @@ fn test_output_hash_concurrent_modifications() {
     let artifacts_path = project.project().artifacts_path();
     let temporary_file_path = artifacts_path.join("changing.json");
     let temporary_file_path_clone = temporary_file_path.clone();
-    
+
     let handle = std::thread::spawn(move || {
         for index in 0..5 {
             fs::write(&temporary_file_path_clone, format!("content_{}", index)).unwrap();
@@ -4604,11 +4604,11 @@ fn test_output_hash_nested_directories() {
     let project = TempProject::<MultiCompiler, ConfigurableArtifacts>::new(paths).unwrap();
 
     let artifacts_path = project.project().artifacts_path();
-    
+
     // Create nested directory structure.
     let nested_directory = artifacts_path.join("a/b/c");
     fs::create_dir_all(&nested_directory).unwrap();
-    
+
     // Add files at different levels.
     fs::write(artifacts_path.join("root.json"), "root").unwrap();
     fs::write(artifacts_path.join("a/level1.json"), "level1").unwrap();
@@ -4634,7 +4634,7 @@ fn test_output_hash_special_filenames() {
 
     let artifacts_path = project.project().artifacts_path();
     fs::create_dir_all(&artifacts_path).unwrap();
-    
+
     // Create files with special characters in names.
     fs::write(artifacts_path.join("space file.json"), "space").unwrap();
     fs::write(artifacts_path.join("underscore_file.json"), "underscore").unwrap();
