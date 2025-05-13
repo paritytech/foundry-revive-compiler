@@ -153,7 +153,7 @@ impl Resolc {
                     let message = if let Some(v) = &_resolc_version {
                         format!("`resolc` v{v} doesn't exist")
                     } else {
-                        format!("No `resolc` versions available.")
+                        "No `resolc` versions available.".to_string()
                     };
                     return Err(SolcError::Message(message));
                 };
@@ -353,7 +353,9 @@ impl Resolc {
             cmd.arg(&solc.solc);
             cmd.arg("--standard-json");
             let mut child = cmd.spawn().map_err(map_io_err(&self.resolc))?;
-            let mut stdin = io::BufWriter::new(child.stdin.take().unwrap());
+            let mut stdin = io::BufWriter::new(
+                child.stdin.take().ok_or(SolcError::msg("`resolc` `stdin` closed"))?,
+            );
             serde_json::to_writer(&mut stdin, &input)?;
             stdin.flush().map_err(map_io_err(&self.resolc))?;
             child
