@@ -149,7 +149,14 @@ impl Resolc {
                     .filter(|x| _resolc_version.is_none_or(|version| version == x.version()))
                     .collect();
 
-                let binary = versions.into_iter().next_back().expect("Can't be empty");
+                let Some(binary) = versions.into_iter().next_back() else {
+                    let message = if let Some(v) = &_resolc_version {
+                        format!("`resolc` v{v} doesn't exist")
+                    } else {
+                        format!("No `resolc` versions available.")
+                    };
+                    return Err(SolcError::Message(message));
+                };
 
                 let binary_info = match binary {
                     Binary::Remote(binary_info) => binary_info,
