@@ -425,7 +425,7 @@ fn compile_output(output: Output) -> Result<Vec<u8>> {
 }
 
 #[cfg(test)]
-#[cfg(any(feature = "full"))]
+#[cfg(feature = "full")]
 mod test {
     use foundry_compilers_core::error::SolcError;
 
