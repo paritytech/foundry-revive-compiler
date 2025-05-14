@@ -423,3 +423,23 @@ fn compile_output(output: Output) -> Result<Vec<u8>> {
         Err(SolcError::solc_output(&output))
     }
 }
+
+#[cfg(test)]
+#[cfg(any(feature = "full"))]
+mod test {
+    use foundry_compilers_core::error::SolcError;
+
+    use super::Resolc;
+
+    #[test]
+    fn not_existing_version() {
+        let result = Resolc::install(
+            semver::Version::parse("0.1.0-dev.33").ok().as_ref(),
+            crate::solc::SolcCompiler::AutoDetect,
+        )
+        .expect_err("should fail");
+        assert!(
+            matches!(result, SolcError::Message(msg) if msg == "`resolc` v0.1.0-dev.33 doesn't exist")
+        )
+    }
+}
