@@ -1,5 +1,5 @@
 use super::{
-    resolc::{Resolc, ResolcVersionedInput},
+    resolc::{Resolc, ResolcSettings, ResolcVersionedInput},
     restrictions::CompilerSettingsRestrictions,
     solc::{SolcCompiler, SolcSettings, SolcVersionedInput, SOLC_EXTENSIONS},
     vyper::{
@@ -158,62 +158,156 @@ impl CompilerSettingsRestrictions for MultiCompilerRestrictions {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SoliditySettings {
+    Solc(SolcSettings),
+    Resolc(ResolcSettings),
+}
+
+impl SoliditySettings {
+    pub fn as_solc(&self) -> Option<&SolcSettings> {
+        if let Self::Solc(ref s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_resolc(&self) -> Option<&ResolcSettings> {
+        if let Self::Resolc(ref r) = self {
+            Some(r)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_solc_mut(&mut self) -> Option<&mut SolcSettings> {
+        if let Self::Solc(ref mut s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_resolc_mut(&mut self) -> Option<&mut ResolcSettings> {
+        if let Self::Resolc(ref mut r) = self {
+            Some(r)
+        } else {
+            None
+        }
+    }
+
+    pub fn map(
+        self,
+        f_solc: impl FnOnce(SolcSettings) -> SolcSettings,
+        f_resolc: impl FnOnce(ResolcSettings) -> ResolcSettings,
+    ) -> Self {
+        match self {
+            Self::Solc(s) => Self::Solc(f_solc(s)),
+            Self::Resolc(r) => Self::Resolc(f_resolc(r)),
+        }
+    }
+
+    pub fn satisfies_restrictions(&self, restrictions: &MultiCompilerRestrictions) -> bool {
+        match self {
+            Self::Solc(s1) => s1.satisfies_restrictions(&restrictions.solc),
+            Self::Resolc(r1) => r1.satisfies_restrictions(&restrictions.solc),
+        }
+    }
+
+    pub fn can_use_cached(&self, other: &SoliditySettings) -> bool {
+        match (self, other) {
+            (Self::Solc(s1), Self::Solc(s2)) => s1.can_use_cached(s2),
+            (Self::Resolc(r1), Self::Resolc(r2)) => r1.can_use_cached(r2),
+            _ => false,
+        }
+    }
+}
+
 /// Settings for the [MultiCompiler]. Includes settings for both Solc and Vyper compilers.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MultiCompilerSettings {
-    pub solc: SolcSettings,
+    pub solidity: SoliditySettings,
     pub vyper: VyperSettings,
+}
+
+impl Default for MultiCompilerSettings {
+    fn default() -> Self {
+        Self {
+            solidity: SoliditySettings::Solc(SolcSettings::default()),
+            vyper: VyperSettings::default(),
+        }
+    }
 }
 
 impl CompilerSettings for MultiCompilerSettings {
     type Restrictions = MultiCompilerRestrictions;
 
     fn can_use_cached(&self, other: &Self) -> bool {
-        self.solc.can_use_cached(&other.solc) && self.vyper.can_use_cached(&other.vyper)
+        self.solidity.can_use_cached(&other.solidity) && self.vyper.can_use_cached(&other.vyper)
     }
 
     fn update_output_selection(&mut self, f: impl FnOnce(&mut OutputSelection) + Copy) {
-        self.solc.update_output_selection(f);
+        if let Some(solc) = self.solidity.as_solc_mut() {
+            solc.update_output_selection(f);
+        } else if let Some(resolc) = self.solidity.as_resolc_mut() {
+            resolc.update_output_selection(f);
+        }
         self.vyper.update_output_selection(f);
     }
 
     fn with_allow_paths(self, allowed_paths: &BTreeSet<PathBuf>) -> Self {
         Self {
-            solc: self.solc.with_allow_paths(allowed_paths),
+            solidity: self
+                .solidity
+                .map(|s| s.with_allow_paths(allowed_paths), |r| r.with_allow_paths(allowed_paths)),
             vyper: self.vyper.with_allow_paths(allowed_paths),
         }
     }
 
     fn with_base_path(self, base_path: &Path) -> Self {
         Self {
-            solc: self.solc.with_base_path(base_path),
+            solidity: self
+                .solidity
+                .map(|s| s.with_base_path(base_path), |r| r.with_base_path(base_path)),
             vyper: self.vyper.with_base_path(base_path),
         }
     }
 
     fn with_include_paths(self, include_paths: &BTreeSet<PathBuf>) -> Self {
         Self {
-            solc: self.solc.with_include_paths(include_paths),
+            solidity: self.solidity.map(
+                |s| s.with_include_paths(include_paths),
+                |r| r.with_include_paths(include_paths),
+            ),
             vyper: self.vyper.with_include_paths(include_paths),
         }
     }
 
     fn with_remappings(self, remappings: &[Remapping]) -> Self {
         Self {
-            solc: self.solc.with_remappings(remappings),
+            solidity: self
+                .solidity
+                .map(|s| s.with_remappings(remappings), |r| r.with_remappings(remappings)),
             vyper: self.vyper.with_remappings(remappings),
         }
     }
 
     fn satisfies_restrictions(&self, restrictions: &Self::Restrictions) -> bool {
-        self.solc.satisfies_restrictions(&restrictions.solc)
+        self.solidity.satisfies_restrictions(&restrictions)
             && self.vyper.satisfies_restrictions(&restrictions.vyper)
     }
 }
 
 impl From<MultiCompilerSettings> for SolcSettings {
     fn from(settings: MultiCompilerSettings) -> Self {
-        settings.solc
+        settings.solidity.as_solc().cloned().expect("Expected SolcSettings")
+    }
+}
+
+impl From<MultiCompilerSettings> for ResolcSettings {
+    fn from(settings: MultiCompilerSettings) -> Self {
+        settings.solidity.as_resolc().cloned().expect("Expected ResolcSettings")
     }
 }
 
@@ -228,6 +322,7 @@ impl From<MultiCompilerSettings> for VyperSettings {
 #[serde(untagged)]
 pub enum MultiCompilerInput {
     Solc(SolcVersionedInput),
+    Resolc(ResolcVersionedInput),
     Vyper(VyperVersionedInput),
 }
 
@@ -241,11 +336,16 @@ impl CompilerInput for MultiCompilerInput {
         language: Self::Language,
         version: Version,
     ) -> Self {
-        match language {
-            MultiCompilerLanguage::Solc(language) => {
-                Self::Solc(SolcVersionedInput::build(sources, settings.solc, language, version))
-            }
-            MultiCompilerLanguage::Vyper(language) => {
+        match (language, settings.clone()) {
+            (MultiCompilerLanguage::Solc(language), settings) => match settings.solidity {
+                SoliditySettings::Resolc(r) => {
+                    Self::Resolc(ResolcVersionedInput::build(sources, r, language, version))
+                }
+                SoliditySettings::Solc(s) => {
+                    Self::Solc(SolcVersionedInput::build(sources, s, language, version))
+                }
+            },
+            (MultiCompilerLanguage::Vyper(language), _) => {
                 Self::Vyper(VyperVersionedInput::build(sources, settings.vyper, language, version))
             }
         }
@@ -254,6 +354,7 @@ impl CompilerInput for MultiCompilerInput {
     fn language(&self) -> Self::Language {
         match self {
             Self::Solc(input) => MultiCompilerLanguage::Solc(input.language()),
+            Self::Resolc(input) => MultiCompilerLanguage::Solc(input.language()),
             Self::Vyper(input) => MultiCompilerLanguage::Vyper(input.language()),
         }
     }
@@ -261,6 +362,7 @@ impl CompilerInput for MultiCompilerInput {
     fn strip_prefix(&mut self, base: &Path) {
         match self {
             Self::Solc(input) => input.strip_prefix(base),
+            Self::Resolc(input) => input.strip_prefix(base),
             Self::Vyper(input) => input.strip_prefix(base),
         }
     }
@@ -268,6 +370,7 @@ impl CompilerInput for MultiCompilerInput {
     fn version(&self) -> &Version {
         match self {
             Self::Solc(input) => input.version(),
+            Self::Resolc(input) => input.version(),
             Self::Vyper(input) => input.version(),
         }
     }
@@ -275,6 +378,7 @@ impl CompilerInput for MultiCompilerInput {
     fn sources(&self) -> impl Iterator<Item = (&Path, &Source)> {
         let ret: Box<dyn Iterator<Item = _>> = match self {
             Self::Solc(input) => Box::new(input.sources()),
+            Self::Resolc(input) => Box::new(input.sources()),
             Self::Vyper(input) => Box::new(input.sources()),
         };
 
@@ -294,17 +398,24 @@ impl Compiler for MultiCompiler {
         match input {
             MultiCompilerInput::Solc(sol) => match &self.solidity {
                 SolidityCompiler::Solc(solc) => solc.compiler_version(sol),
+                SolidityCompiler::Resolc(_) => {
+                    panic!("Compiler wrong config resolc");
+                }
+                SolidityCompiler::MissingInstallation => sol.version().clone(),
+            },
+            MultiCompilerInput::Resolc(sol) => match &self.solidity {
+                SolidityCompiler::Solc(_) => panic!("Compiler wrong config solc"),
                 SolidityCompiler::Resolc(r) => {
-                    let input = sol.clone();
-                    let input = ResolcVersionedInput::build(
-                        input.input.sources,
-                        SolcSettings {
-                            settings: input.input.settings,
-                            cli_settings: input.cli_settings,
-                        },
-                        input.input.language,
-                        input.version,
-                    );
+                    let input: ResolcVersionedInput = sol.clone();
+                    // let input = ResolcVersionedInput::build(
+                    //     input.input.sources,
+                    //     SolcSettings {
+                    //         settings: input.input.settings,
+                    //         cli_settings: input.cli_settings,
+                    //     },
+                    //     input.input.language,
+                    //     input.version,
+                    // );
                     r.compiler_version(&input)
                 }
                 SolidityCompiler::MissingInstallation => sol.version().clone(),
@@ -324,6 +435,11 @@ impl Compiler for MultiCompiler {
                 SolidityCompiler::Resolc(_) => Resolc::compiler_name_default(),
                 SolidityCompiler::MissingInstallation => "No applicable compilers installed".into(),
             },
+            MultiCompilerInput::Resolc(_) => match &self.solidity {
+                SolidityCompiler::Solc(_) => SolcCompiler::compiler_name_default(),
+                SolidityCompiler::Resolc(_) => Resolc::compiler_name_default(),
+                SolidityCompiler::MissingInstallation => "No applicable compilers installed".into(),
+            },
             MultiCompilerInput::Vyper(_) => Vyper::compiler_name_default(),
         }
     }
@@ -336,20 +452,29 @@ impl Compiler for MultiCompiler {
             MultiCompilerInput::Solc(input) => match &self.solidity {
                 SolidityCompiler::Solc(solc_compiler) => Compiler::compile(solc_compiler, input)
                     .map(|res| res.map_err(MultiCompilerError::Solc)),
-                SolidityCompiler::Resolc(resolc) => {
-                    let input = input.clone();
-                    let input = ResolcVersionedInput::build(
-                        input.input.sources,
-                        SolcSettings {
-                            settings: input.input.settings,
-                            cli_settings: input.cli_settings,
-                        },
-                        input.input.language,
-                        input.version,
-                    );
-                    Compiler::compile(resolc, &input)
-                        .map(|res| res.map_err(MultiCompilerError::Solc))
+                SolidityCompiler::Resolc(_) => {
+                    panic!("unmatched configs")
+                    // let input = input.clone();
+                    // let input = ResolcVersionedInput::build(
+                    //     input.input.sources,
+                    //     SolcSettings {
+                    //         settings: input.input.settings,
+                    //         cli_settings: input.cli_settings,
+                    //     },
+                    //     input.input.language,
+                    //     input.version,
+                    // );
+                    // Compiler::compile(resolc, &input)
+                    //     .map(|res| res.map_err(MultiCompilerError::Solc))
                 }
+                SolidityCompiler::MissingInstallation => {
+                    Err(SolcError::msg("No solidity compiler is available"))
+                }
+            },
+            MultiCompilerInput::Resolc(input) => match &self.solidity {
+                SolidityCompiler::Resolc(solc_compiler) => Compiler::compile(solc_compiler, input)
+                    .map(|res| res.map_err(MultiCompilerError::Solc)),
+                SolidityCompiler::Solc(_) => panic!("unmatched configs"),
                 SolidityCompiler::MissingInstallation => {
                     Err(SolcError::msg("No solidity compiler is available"))
                 }

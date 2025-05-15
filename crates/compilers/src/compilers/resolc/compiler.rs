@@ -1,7 +1,7 @@
 use crate::{
     error::{Result, SolcError},
     resolver::parse::SolData,
-    solc::{Solc, SolcCompiler, SolcSettings},
+    solc::{Solc, SolcCompiler},
     Compiler, CompilerVersion, SimpleCompilerName,
 };
 use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Contract, Error, SolcLanguage};
@@ -16,7 +16,7 @@ use std::{
     str::FromStr,
 };
 
-use super::{ResolcInput, ResolcVersionedInput};
+use super::{ResolcInput, ResolcSettings, ResolcVersionedInput};
 
 #[derive(Clone, Debug)]
 pub struct Resolc {
@@ -31,7 +31,7 @@ impl Compiler for Resolc {
     type Input = ResolcVersionedInput;
     type CompilationError = Error;
     type ParsedSource = SolData;
-    type Settings = SolcSettings;
+    type Settings = ResolcSettings;
     type Language = SolcLanguage;
 
     fn compiler_version(&self, _input: &Self::Input) -> Version {
@@ -345,6 +345,9 @@ impl Resolc {
             cmd.arg("--solc");
             cmd.arg(&solc.solc);
             cmd.arg("--standard-json");
+            let json_string = serde_json::to_string_pretty(&input)?;
+            println!("{json_string}");
+
             let mut child = cmd.spawn().map_err(map_io_err(&self.resolc))?;
             let mut stdin = io::BufWriter::new(child.stdin.take().unwrap());
             serde_json::to_writer(&mut stdin, &input)?;
