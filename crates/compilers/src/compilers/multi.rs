@@ -208,14 +208,14 @@ impl SoliditySettings {
         }
     }
 
-    pub fn satisfies_restrictions(&self, restrictions: &MultiCompilerRestrictions) -> bool {
+    pub fn satisfies_restrictions(&self, restrictions: &SolcRestrictions) -> bool {
         match self {
-            Self::Solc(s1) => s1.satisfies_restrictions(&restrictions.solc),
-            Self::Resolc(r1) => r1.satisfies_restrictions(&restrictions.solc),
+            Self::Solc(s1) => s1.satisfies_restrictions(restrictions),
+            Self::Resolc(r1) => r1.satisfies_restrictions(restrictions),
         }
     }
 
-    pub fn can_use_cached(&self, other: &SoliditySettings) -> bool {
+    pub fn can_use_cached(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Solc(s1), Self::Solc(s2)) => s1.can_use_cached(s2),
             (Self::Resolc(r1), Self::Resolc(r2)) => r1.can_use_cached(r2),
@@ -294,7 +294,7 @@ impl CompilerSettings for MultiCompilerSettings {
     }
 
     fn satisfies_restrictions(&self, restrictions: &Self::Restrictions) -> bool {
-        self.solidity.satisfies_restrictions(&restrictions)
+        self.solidity.satisfies_restrictions(&restrictions.solc)
             && self.vyper.satisfies_restrictions(&restrictions.vyper)
     }
 }

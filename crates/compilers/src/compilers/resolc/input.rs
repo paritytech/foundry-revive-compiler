@@ -330,7 +330,7 @@ impl<'de> Deserialize<'de> for ResolcJsonSettings {
         let stack_size =
             memory_config.and_then(|mem| mem.get("stack_size")).and_then(Value::as_u64);
 
-        Ok(ResolcJsonSettings { settings, optimizer_mode, heap_size, stack_size })
+        Ok(Self { settings, optimizer_mode, heap_size, stack_size })
     }
 }
 
