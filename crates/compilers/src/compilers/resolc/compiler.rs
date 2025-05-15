@@ -150,7 +150,7 @@ impl Resolc {
                                 .map_err(|e| SolcError::Message(e.to_string()))?
                         } else {
                             version_manager
-                                .get_or_install(&resolc_version, _solc_version.clone())
+                                .get_or_install(resolc_version, _solc_version.clone())
                                 .map_err(|e| SolcError::Message(e.to_string()))?
                         }
                     } else {
@@ -470,7 +470,7 @@ mod test {
         .expect_err("should fail");
         assert_eq!(
             result.to_string(), 
-            "Unsupported version of `solc` - v0.4.14 for Resolc v0.1.0-dev.13. Only versions \">=0.8.0, <=0.8.29\" is supported by this version of Resolc",
+            "Unsupported version of `solc` - v0.4.14 for Resolc v0.1.0-dev.13. Only versions \">=0.8.0, <=0.8.29\" is supported by this version of Resolc"
         )
     }
 }
