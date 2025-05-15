@@ -469,7 +469,7 @@ mod test {
         )
         .expect_err("should fail");
         assert_eq!(
-            result.to_string(), 
+            result.to_string(),
             "Unsupported version of `solc` - v0.4.14 for Resolc v0.1.0-dev.13. Only versions \">=0.8.0, <=0.8.29\" is supported by this version of Resolc"
         )
     }
