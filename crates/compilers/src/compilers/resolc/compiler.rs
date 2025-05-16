@@ -2,7 +2,7 @@ use crate::{
     error::{Result, SolcError},
     resolver::parse::SolData,
     solc::{Solc, SolcCompiler, SolcSettings},
-    Compiler, CompilerVersion, SimpleCompilerName,
+    Compiler, CompilerInput, CompilerVersion, SimpleCompilerName,
 };
 use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Contract, Error, SolcLanguage};
 use itertools::Itertools;
@@ -35,7 +35,17 @@ impl Compiler for Resolc {
     type Language = SolcLanguage;
 
     fn compiler_version(&self, _input: &Self::Input) -> Version {
-        self.resolc_version.clone()
+        let mut v = self.resolc_version.clone();
+        let input_version = _input.version();
+
+        // Note it shouldn't fail as parsing code assumes that there can be an optional string
+        // that precludes the version number
+        v.build = semver::BuildMetadata::new(&format!(
+            "Solc.{}.{}.{}",
+            input_version.major, input_version.minor, input_version.patch
+        ))
+        .expect("Can't fail");
+        v
     }
 
     fn compiler_name(&self, _input: &Self::Input) -> std::borrow::Cow<'static, str> {
@@ -75,7 +85,8 @@ impl Compiler for Resolc {
 
 impl SimpleCompilerName for Resolc {
     fn compiler_name_default() -> std::borrow::Cow<'static, str> {
-        "Resolc and Solc".into()
+        // Single `Resolc` is sufficient because we now add `Solc` to `compiler_version` buildMeta.
+        "Resolc".into()
     }
 }
 
@@ -225,7 +236,7 @@ impl Resolc {
                 rvm::VersionManager::new(true).map_err(|e| SolcError::Message(e.to_string()))?;
 
             let versions: Vec<Binary> = version_manager
-                .list_available(_solc_version.clone())
+                .list_available(_solc_version)
                 .map_err(|e| SolcError::Message(e.to_string()))?
                 .into_iter()
                 .filter(|x| _resolc_version.is_none_or(|version| version == x.version()))
