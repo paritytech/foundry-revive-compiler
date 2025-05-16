@@ -118,6 +118,10 @@ impl Compiler for SolcCompiler {
             }
         }
     }
+
+    fn settings(&self) -> Self::Settings {
+        Default::default()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

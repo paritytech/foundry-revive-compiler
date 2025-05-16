@@ -7,6 +7,7 @@ use crate::{
         Compiler,
     },
     config::ProjectPathsConfigBuilder,
+    multi::SoliditySettings,
     solc::SolcSettings,
     Artifact, ArtifactOutput, Artifacts, ConfigurableArtifacts, HardhatArtifacts, PathStyle,
     Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig,
@@ -54,7 +55,10 @@ impl<
 
     /// Overwrites the settings to pass to `solc`
     pub fn with_solc_settings(mut self, settings: impl Into<Settings>) -> Self {
-        self.inner.settings.solc = SolcSettings { settings: settings.into(), ..Default::default() };
+        self.inner.settings.solidity = SoliditySettings::Solc(SolcSettings {
+            settings: settings.into(),
+            ..Default::default()
+        });
         self
     }
 

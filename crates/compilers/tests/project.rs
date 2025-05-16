@@ -19,8 +19,8 @@ use foundry_compilers::{
     project::{Preprocessor, ProjectCompiler},
     project_util::*,
     solc::{Restriction, SolcRestrictions, SolcSettings},
-    take_solc_installer_lock, Artifact, ConfigurableArtifacts, ExtraOutputValues, Graph, Project,
-    ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, RestrictionsWithVersion,
+    take_solc_installer_lock, Artifact, Compiler, ConfigurableArtifacts, ExtraOutputValues, Graph,
+    Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, RestrictionsWithVersion,
     TestFileFilter,
 };
 use foundry_compilers_artifacts::{
@@ -4281,15 +4281,15 @@ fn test_can_compile_multi(#[case] compiler: MultiCompiler) {
         .build::<MultiCompilerLanguage>()
         .unwrap();
 
+    let compiler = MultiCompiler { solidity: compiler.solidity, vyper: Some(VYPER.clone()) };
+
     let settings = MultiCompilerSettings {
         vyper: VyperSettings {
             output_selection: OutputSelection::default_output_selection(),
             ..Default::default()
         },
-        solc: Default::default(),
+        solidity: compiler.settings().solidity,
     };
-
-    let compiler = MultiCompiler { solidity: compiler.solidity, vyper: Some(VYPER.clone()) };
 
     let project = ProjectBuilder::<MultiCompiler>::new(Default::default())
         .settings(settings)
@@ -4344,7 +4344,16 @@ fn test_settings_restrictions(#[case] compiler: MultiCompiler) {
     project.project_mut().compiler = compiler;
 
     // default EVM version is Paris, Cancun contract won't compile
-    project.project_mut().settings.solc.evm_version = Some(EvmVersion::Paris);
+    project.project_mut().settings.solidity = project.project_mut().settings.solidity.map(
+        |solc| {
+            solc.evm_version = Some(EvmVersion::Paris);
+            solc
+        },
+        |resolc| {
+            resolc.evm_version = Some(EvmVersion::Paris);
+            resolc
+        },
+    );
 
     let common_path = project.add_source("Common.sol", "").unwrap();
 

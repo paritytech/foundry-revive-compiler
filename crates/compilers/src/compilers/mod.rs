@@ -68,7 +68,7 @@ impl fmt::Display for CompilerVersion {
 
 /// Compilation settings including evm_version, output_selection, etc.
 pub trait CompilerSettings:
-    Default + Serialize + DeserializeOwned + Clone + Debug + Send + Sync + 'static
+    Serialize + DeserializeOwned + Clone + Debug + Send + Sync + 'static
 {
     /// We allow configuring settings restrictions which might optionally contain specific
     /// requiremets for compiler configuration. e.g. min/max evm_version, optimizer runs
@@ -352,6 +352,8 @@ pub trait Compiler: Send + Sync + Clone {
     /// Returns all versions available locally and remotely. Should return versions with stripped
     /// metadata.
     fn available_versions(&self, language: &Self::Language) -> Vec<CompilerVersion>;
+
+    fn settings(&self) -> Self::Settings;
 }
 
 pub(crate) fn cache_version(
