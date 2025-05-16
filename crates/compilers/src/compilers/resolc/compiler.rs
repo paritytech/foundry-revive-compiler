@@ -36,7 +36,15 @@ impl Compiler for Resolc {
 
     fn compiler_version(&self, _input: &Self::Input) -> Version {
         let mut v = self.resolc_version.clone();
-        v.build = semver::BuildMetadata::new(&format!("Solc.{}", _input.version())).unwrap();
+        let input_version = _input.version();
+
+        // Note it shouldn't fail as parsing code assumes that there can be an optional string
+        // that precludes the version number
+        v.build = semver::BuildMetadata::new(&format!(
+            "Solc.{}.{}.{}",
+            input_version.major, input_version.minor, input_version.patch
+        ))
+        .expect("Can't fail");
         v
     }
 
