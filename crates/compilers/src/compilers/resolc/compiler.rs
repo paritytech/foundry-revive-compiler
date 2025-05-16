@@ -71,6 +71,10 @@ impl Compiler for Resolc {
             serde_json::from_str(output).map_err(|e| SolcError::msg(e.to_string()))?;
         Ok(results.into())
     }
+
+    fn settings(&self) -> Self::Settings {
+        Default::default()
+    }
 }
 
 impl SimpleCompilerName for Resolc {

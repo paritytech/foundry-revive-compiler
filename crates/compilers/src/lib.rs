@@ -167,6 +167,7 @@ impl<T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler> Pro
 
 impl<C: Compiler, T: ArtifactOutput<CompilerContract = C::CompilerContract>> Project<C, T>
 where
+    // TODO Into soliditysettings
     C::Settings: Into<SolcSettings>,
 {
     /// Returns standard-json-input to compile the target contract
@@ -205,6 +206,7 @@ where
             .map(|r| r.into_relative(self.root()).to_relative_remapping())
             .collect::<Vec<_>>();
 
+        // TODO: add resolc support
         let input = StandardJsonCompilerInput::new(sources, settings.settings);
 
         Ok(input)
@@ -697,6 +699,8 @@ impl<C: Compiler, T: ArtifactOutput<CompilerContract = C::CompilerContract>> Pro
             paths.slash_paths();
         }
 
+        let settings = settings.unwrap_or(compiler.settings());
+
         Ok(Project {
             compiler,
             paths,
@@ -712,7 +716,7 @@ impl<C: Compiler, T: ArtifactOutput<CompilerContract = C::CompilerContract>> Pro
                 .unwrap_or(1),
             offline,
             slash_paths,
-            settings: settings.unwrap_or_default(),
+            settings,
             sparse_output,
             additional_settings,
             restrictions,

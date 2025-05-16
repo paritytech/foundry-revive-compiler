@@ -235,4 +235,8 @@ impl Compiler for Vyper {
             self.version.patch,
         ))]
     }
+
+    fn settings(&self) -> Self::Settings {
+        Default::default()
+    }
 }

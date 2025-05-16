@@ -162,7 +162,9 @@ impl CompilerSettings for ResolcSettings {
                             libraries,
                             eof_version,
                         },
-                    ..
+                    stack_size,
+                    heap_size,
+                    optimizer_mode,
                 },
             ..
         } = self;
@@ -178,6 +180,9 @@ impl CompilerSettings for ResolcSettings {
             && *libraries == other.settings.settings.libraries
             && *eof_version == other.settings.settings.eof_version
             && output_selection.is_subset_of(&other.settings.settings.output_selection)
+            && *stack_size == other.stack_size
+            && *heap_size == other.heap_size
+            && *optimizer_mode == other.optimizer_mode
     }
 
     fn with_remappings(mut self, remappings: &[Remapping]) -> Self {
@@ -202,7 +207,7 @@ impl CompilerSettings for ResolcSettings {
     }
 
     fn satisfies_restrictions(&self, restrictions: &Self::Restrictions) -> bool {
-        //TODO consider adding the logic for resolc restrictions
+        // TODO Add resolc restrictions
         let mut satisfies = true;
 
         let SolcRestrictions { evm_version, via_ir, optimizer_runs, bytecode_hash } = restrictions;
@@ -335,7 +340,7 @@ impl<'de> Deserialize<'de> for ResolcJsonSettings {
 }
 
 impl ResolcJsonSettings {
-    /// Creates a new `Settings` instance with the given `output_selection`
+    /// Creates a new `ResolcJsonSettings` instance with the given `output_selection`
     pub fn new(output_selection: impl Into<OutputSelection>) -> Self {
         let mut s: Self = Default::default();
         s.settings.output_selection = output_selection.into();
