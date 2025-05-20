@@ -61,10 +61,10 @@ impl Compiler for Resolc {
         input: &Self::Input,
     ) -> Result<crate::compilers::CompilerOutput<Error, Self::CompilerContract>, SolcError> {
         let mut solc = self.solc(input)?;
-        solc.base_path.clone_from(&input.input.settings.cli_settings.base_path);
-        solc.allow_paths.clone_from(&input.input.settings.cli_settings.allow_paths);
-        solc.include_paths.clone_from(&input.input.settings.cli_settings.include_paths);
-        solc.extra_args.extend_from_slice(&input.input.settings.cli_settings.extra_args);
+        solc.base_path.clone_from(&input.cli_settings.base_path);
+        solc.allow_paths.clone_from(&input.cli_settings.allow_paths);
+        solc.include_paths.clone_from(&input.cli_settings.include_paths);
+        solc.extra_args.extend_from_slice(&input.cli_settings.extra_args);
         let results = self.compile_output::<ResolcInput>(&solc, &input.input)?;
         let output = std::str::from_utf8(&results).map_err(|_| SolcError::InvalidUtf8)?;
         let results: ResolcCompilerOutput =
