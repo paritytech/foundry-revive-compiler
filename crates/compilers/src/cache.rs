@@ -1051,7 +1051,11 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
                 if let Ok(cache) = CompilerCache::read_joined(&project.paths) {
                     if cache.paths == paths && preprocessed == cache.preprocessed {
                         // unchanged project paths and same preprocess cache option
-                        return cache;
+                        if cache.builds.iter().all(|x| {
+                            project.paths.build_infos.join(x).with_extension("json").exists()
+                        }) {
+                            return cache;
+                        }
                     }
                 }
             }
@@ -1257,24 +1261,6 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             cache
                 .strip_entries_prefix(project.root())
                 .strip_artifact_files_prefixes(project.artifacts_path());
-            let mut additional_removals = vec![];
-            let written_builds_set =
-                written_build_infos.iter().map(|x| &x.id).collect::<BTreeSet<_>>();
-            for entry in cache
-                .entries()
-                .flat_map(|e| e.artifacts.values())
-                .flat_map(|a| a.values())
-                .flat_map(|a| a.values())
-            {
-                let path = cache.paths.build_infos.join(&entry.build_id).with_extension("json");
-                if !path.exists() && !written_builds_set.contains(&entry.build_id) {
-                    additional_removals.push(entry.clone());
-                }
-            }
-            for entry in additional_removals {
-                cache.builds.remove(&entry.build_id);
-                cache.remove(&entry.path);
-            }
             cache.write(project.cache_path())?;
         }
 
