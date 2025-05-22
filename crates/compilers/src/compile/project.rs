@@ -450,7 +450,7 @@ impl<L: Language, S: CompilerSettings> CompilerSources<'_, L, S> {
                     C::Input::build(sources.clone(), settings.clone(), *language, version.clone());
                 let version = compound_version(
                     cache.project().compiler.compiler_version(&input),
-                    &input.version(),
+                    input.version(),
                 );
                 trace!("Filtering {} sources for {}", sources.len(), version);
                 cache.filter(sources, &version, profile);
@@ -548,7 +548,7 @@ impl<L: Language, S: CompilerSettings> CompilerSources<'_, L, S> {
         for (input, mut output, profile, actually_dirty) in results {
             let version = compound_version(
                 project.compiler.compiler_version(&input).clone(),
-                &input.version(),
+                input.version(),
             );
             // Mark all files as seen by the compiler
             for file in &actually_dirty {

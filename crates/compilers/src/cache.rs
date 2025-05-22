@@ -170,11 +170,6 @@ impl<S: CompilerSettings> CompilerCache<S> {
             {
                 outdated.push(build_id.to_owned());
             }
-
-            let path = self.paths.build_infos.join(build_id).with_extension("json");
-            if !path.exists() {
-                outdated.push(build_id.to_owned());
-            }
         }
 
         for build_id in outdated {
@@ -1262,6 +1257,28 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
             cache
                 .strip_entries_prefix(project.root())
                 .strip_artifact_files_prefixes(project.artifacts_path());
+            let mut additional_removals = vec![];
+            for entry in cache
+                .entries()
+                .flat_map(|e| e.artifacts.values())
+                .flat_map(|a| a.values())
+                .flat_map(|a| a.values())
+            {
+                let path = cache.paths.build_infos.join(&entry.build_id).with_extension("json");
+                if !path.exists()
+                    && !written_build_infos
+                        .iter()
+                        .map(|x| &x.id)
+                        .collect::<BTreeSet<_>>()
+                        .contains(&entry.build_id)
+                {
+                    additional_removals.push(entry.clone());
+                }
+            }
+            for entry in additional_removals {
+                cache.builds.remove(&entry.build_id);
+                cache.remove(&entry.path);
+            }
             cache.write(project.cache_path())?;
         }
 

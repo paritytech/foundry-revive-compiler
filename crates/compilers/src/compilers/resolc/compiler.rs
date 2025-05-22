@@ -243,13 +243,13 @@ impl Resolc {
                 rvm::VersionManager::new(true).map_err(|e| SolcError::Message(e.to_string()))?;
             let binary = if let Some(resolc_version) = _resolc_version {
                 if version_manager.is_installed(resolc_version) {
-                    version_manager.get(resolc_version, _solc_version.clone()).ok()
+                    version_manager.get(resolc_version, _solc_version).ok()
                 } else {
                     None
                 }
             } else {
                 let versions: Vec<Binary> = version_manager
-                    .list_available(_solc_version.clone())
+                    .list_available(_solc_version)
                     .map_err(|e| SolcError::Message(e.to_string()))?
                     .into_iter()
                     .collect();
