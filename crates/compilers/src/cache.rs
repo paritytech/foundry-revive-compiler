@@ -20,9 +20,7 @@ use semver::Version;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::{btree_map::BTreeMap, hash_map, BTreeSet, HashMap, HashSet},
-    ffi::OsStr,
-    fs::{self, read_dir, DirEntry},
-    io,
+    fs::{self},
     path::{Path, PathBuf},
     time::{Duration, UNIX_EPOCH},
 };
