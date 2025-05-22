@@ -170,6 +170,11 @@ impl<S: CompilerSettings> CompilerCache<S> {
             {
                 outdated.push(build_id.to_owned());
             }
+
+            let path = self.paths.build_infos.join(build_id).with_extension("json");
+            if !path.exists() {
+                outdated.push(build_id.to_owned());
+            }
         }
 
         for build_id in outdated {

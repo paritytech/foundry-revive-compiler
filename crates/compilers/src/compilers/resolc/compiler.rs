@@ -2,7 +2,7 @@ use crate::{
     error::{Result, SolcError},
     resolver::parse::SolData,
     solc::{Solc, SolcCompiler, SolcSettings},
-    Compiler, CompilerInput, CompilerVersion, SimpleCompilerName,
+    Compiler, CompilerVersion, SimpleCompilerName,
 };
 use foundry_compilers_artifacts::{resolc::ResolcCompilerOutput, Contract, Error, SolcLanguage};
 use itertools::Itertools;
@@ -35,17 +35,7 @@ impl Compiler for Resolc {
     type Language = SolcLanguage;
 
     fn compiler_version(&self, _input: &Self::Input) -> Version {
-        let mut v = self.resolc_version.clone();
-        let input_version = _input.version();
-
-        // Note it shouldn't fail as parsing code assumes that there can be an optional string
-        // that precludes the version number
-        v.build = semver::BuildMetadata::new(&format!(
-            "Solc.{}.{}.{}",
-            input_version.major, input_version.minor, input_version.patch
-        ))
-        .expect("Can't fail");
-        v
+        self.resolc_version.clone()
     }
 
     fn compiler_name(&self, _input: &Self::Input) -> std::borrow::Cow<'static, str> {
