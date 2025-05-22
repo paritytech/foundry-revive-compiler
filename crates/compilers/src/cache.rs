@@ -20,7 +20,9 @@ use semver::Version;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::{btree_map::BTreeMap, hash_map, BTreeSet, HashMap, HashSet},
-    fs,
+    ffi::OsStr,
+    fs::{self, read_dir, DirEntry},
+    io,
     path::{Path, PathBuf},
     time::{Duration, UNIX_EPOCH},
 };
@@ -1055,6 +1057,9 @@ impl<'a, T: ArtifactOutput<CompilerContract = C::CompilerContract>, C: Compiler>
                             project.paths.build_infos.join(x).with_extension("json").exists()
                         }) {
                             return cache;
+                        } else {
+                            // clear all artifacts
+                            let _ = std::fs::remove_dir_all(&project.paths.artifacts);
                         }
                     }
                 }
