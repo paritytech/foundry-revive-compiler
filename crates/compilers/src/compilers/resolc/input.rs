@@ -30,7 +30,7 @@ pub struct PolkaVMSettings {
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResolcSettings {
     #[serde(default)]
-    pub polkavm: PolkaVMSettings,
+    pub polkavm: Option<PolkaVMSettings>,
     #[serde(default)]
     pub resolc_optimizer: ResolcOptimizer,
 }
@@ -41,10 +41,12 @@ impl ResolcSettings {
         heap_size: Option<u32>,
         stack_size: Option<u32>,
     ) -> Self {
-        Self {
-            resolc_optimizer: ResolcOptimizer { mode: optimizer_mode },
-            polkavm: PolkaVMSettings { heap_size, stack_size },
-        }
+        let polkavm = match (heap_size, stack_size) {
+            (None, None) => None,
+            _ => Some(PolkaVMSettings { heap_size, stack_size }),
+        };
+
+        Self { resolc_optimizer: ResolcOptimizer { mode: optimizer_mode }, polkavm }
     }
 }
 
@@ -199,8 +201,8 @@ pub struct ResolcSettingsInput {
     /// Specify EOF version to produce.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eof_version: Option<EofVersion>,
-    #[serde(default)]
-    pub polkavm: PolkaVMSettings,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub polkavm: Option<PolkaVMSettings>,
 }
 
 impl From<SolcSettings> for ResolcSettingsInput {
