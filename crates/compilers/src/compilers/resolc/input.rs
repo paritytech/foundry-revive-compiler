@@ -20,7 +20,14 @@ pub struct ResolcOptimizer {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PolkaVMSettings {
+pub struct PolkaVM {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_config: Option<MemoryConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub debug_information: Option<bool>,
+}
+#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoryConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heap_size: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -30,7 +37,7 @@ pub struct PolkaVMSettings {
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResolcSettings {
     #[serde(default)]
-    pub polkavm: Option<PolkaVMSettings>,
+    pub polkavm: Option<PolkaVM>,
     #[serde(default)]
     pub resolc_optimizer: ResolcOptimizer,
 }
@@ -40,10 +47,15 @@ impl ResolcSettings {
         optimizer_mode: Option<char>,
         heap_size: Option<u32>,
         stack_size: Option<u32>,
+        debug_information: Option<bool>,
     ) -> Self {
-        let polkavm = match (heap_size, stack_size) {
-            (None, None) => None,
-            _ => Some(PolkaVMSettings { heap_size, stack_size }),
+        let polkavm = match (debug_information, heap_size, stack_size) {
+            (None, None, None) => None,
+            (Some(_), None, None) => Some(PolkaVM { debug_information, memory_config: None }),
+            (_, _, _) => Some(PolkaVM {
+                debug_information,
+                memory_config: Some(MemoryConfig { heap_size, stack_size }),
+            }),
         };
 
         Self { resolc_optimizer: ResolcOptimizer { mode: optimizer_mode }, polkavm }
@@ -202,7 +214,7 @@ pub struct ResolcSettingsInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eof_version: Option<EofVersion>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub polkavm: Option<PolkaVMSettings>,
+    pub polkavm: Option<PolkaVM>,
 }
 
 impl From<SolcSettings> for ResolcSettingsInput {
@@ -336,7 +348,7 @@ impl Default for ResolcSettingsInput {
             remappings: Default::default(),
             model_checker: None,
             eof_version: None,
-            polkavm: Default::default(),
+            polkavm: None,
         }
         .with_ast()
     }
