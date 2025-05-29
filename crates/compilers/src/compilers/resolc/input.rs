@@ -19,19 +19,29 @@ pub struct ResolcOptimizer {
     pub mode: Option<char>,
 }
 
-#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolkaVM {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub memory_config: Option<MemoryConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub debug_information: Option<bool>,
+    #[serde(default)]
+    pub memory_config: MemoryConfig,
+    #[serde(default)]
+    pub debug_information: bool,
 }
+
+impl Default for PolkaVM {
+    fn default() -> Self {
+        Self {
+            debug_information: false,
+            memory_config: MemoryConfig { heap_size: 64 * 1024, stack_size: 32 * 1024 },
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MemoryConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub heap_size: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stack_size: Option<u32>,
+    #[serde(default)]
+    pub heap_size: u32,
+    #[serde(default)]
+    pub stack_size: u32,
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,13 +59,28 @@ impl ResolcSettings {
         stack_size: Option<u32>,
         debug_information: Option<bool>,
     ) -> Self {
-        let polkavm = match (debug_information, heap_size, stack_size) {
-            (None, None, None) => None,
-            (Some(_), None, None) => Some(PolkaVM { debug_information, memory_config: None }),
-            (_, _, _) => Some(PolkaVM {
-                debug_information,
-                memory_config: Some(MemoryConfig { heap_size, stack_size }),
-            }),
+        let has_custom_settings =
+            debug_information.is_some() || heap_size.is_some() || stack_size.is_some();
+
+        let polkavm = if has_custom_settings {
+            // Start from defaults and override as needed
+            let mut pvm = PolkaVM::default();
+
+            if let Some(heap_size) = heap_size {
+                pvm.memory_config.heap_size = heap_size
+            }
+
+            if let Some(stack_size) = stack_size {
+                pvm.memory_config.stack_size = stack_size
+            }
+
+            if let Some(debug_information) = debug_information {
+                pvm.debug_information = debug_information
+            }
+
+            Some(pvm)
+        } else {
+            None
         };
 
         Self { resolc_optimizer: ResolcOptimizer { mode: optimizer_mode }, polkavm }
