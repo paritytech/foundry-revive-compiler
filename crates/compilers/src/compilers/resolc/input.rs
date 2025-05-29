@@ -19,29 +19,25 @@ pub struct ResolcOptimizer {
     pub mode: Option<char>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolkaVM {
     #[serde(default)]
     pub memory_config: MemoryConfig,
     #[serde(default)]
     pub debug_information: bool,
 }
-
-impl Default for PolkaVM {
-    fn default() -> Self {
-        Self {
-            debug_information: false,
-            memory_config: MemoryConfig { heap_size: 64 * 1024, stack_size: 32 * 1024 },
-        }
-    }
-}
-
-#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MemoryConfig {
     #[serde(default)]
     pub heap_size: u32,
     #[serde(default)]
     pub stack_size: u32,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self { heap_size: 64 * 1024, stack_size: 32 * 1024 }
+    }
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
