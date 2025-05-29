@@ -104,6 +104,29 @@ pub static RESOLC: LazyLock<Resolc> = LazyLock::new(|| {
     let solc = SolcCompiler::default();
 
     if let Ok(resolc) = Resolc::new("resolc", solc.clone()) {
+        fn compound_version(mut compiler_version: Version, input_version: &Version) -> Version {
+            if compiler_version != *input_version {
+                let build = if compiler_version.build.is_empty() {
+                    semver::BuildMetadata::new(&format!(
+                        "{}.{}.{}",
+                        input_version.major, input_version.minor, input_version.patch,
+                    ))
+                    .expect("can't fail due to parsing")
+                } else {
+                    semver::BuildMetadata::new(&format!(
+                        "{}-{}.{}.{}",
+                        compiler_version.build.as_str(),
+                        input_version.major,
+                        input_version.minor,
+                        input_version.patch,
+                    ))
+                    .expect("can't fail due to parsing")
+                };
+                compiler_version.build = build;
+            };
+            compiler_version
+        }
+        dbg!(compound_version(resolc.resolc_version.clone(), &Version::new(0, 0, 0)));
         return resolc;
     }
 
