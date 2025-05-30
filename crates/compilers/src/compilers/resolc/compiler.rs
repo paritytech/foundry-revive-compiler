@@ -365,6 +365,9 @@ impl Resolc {
             cmd.current_dir(base_path);
         }
 
+        let j = serde_json::to_string_pretty(&input).unwrap();
+        println!("{j}");
+
         let child = if matches!(&input.language, SolcLanguage::Solidity) {
             cmd.arg("--solc");
             cmd.arg(&solc.solc);
