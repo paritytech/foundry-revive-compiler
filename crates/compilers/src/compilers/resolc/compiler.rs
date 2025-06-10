@@ -142,7 +142,7 @@ impl Resolc {
     pub fn find_or_install(resolc_version: &Version, solc_compiler: SolcCompiler) -> Result<Self> {
         #[cfg(any(feature = "async", feature = "svm-solc"))]
         {
-            Self::install(Some(&resolc_version), solc_compiler)
+            Self::install(Some(resolc_version), solc_compiler)
         }
         #[cfg(not(any(feature = "async", feature = "svm-solc")))]
         {
