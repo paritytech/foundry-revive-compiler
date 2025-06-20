@@ -80,6 +80,29 @@ impl SimpleCompilerName for Resolc {
     }
 }
 
+fn binary_compat_info(bin: &Binary) -> VersionReq {
+    match &bin {
+        Binary::Local { info, .. } | Binary::Remote(info) => semver::VersionReq {
+            comparators: vec![
+                Comparator {
+                    op: semver::Op::GreaterEq,
+                    major: info.first_supported_solc_version.major,
+                    minor: Some(info.first_supported_solc_version.minor),
+                    patch: Some(info.first_supported_solc_version.patch),
+                    pre: Prerelease::default(),
+                },
+                Comparator {
+                    op: semver::Op::LessEq,
+                    major: info.last_supported_solc_version.major,
+                    minor: Some(info.last_supported_solc_version.minor),
+                    patch: Some(info.last_supported_solc_version.patch),
+                    pre: Prerelease::default(),
+                },
+            ],
+        },
+    }
+}
+
 impl Resolc {
     pub fn new(resolc_path: impl Into<PathBuf>, solc_compiler: SolcCompiler) -> Result<Self> {
         let resolc_path = resolc_path.into();
@@ -106,33 +129,13 @@ impl Resolc {
             .and_then(|vm| vm.get(resolc_version, solc_version))
             .map_err(|e| SolcError::Message(e.to_string()))
             .and_then(|bin| {
-                let supported_solc_versions = match &bin {
-                    Binary::Local { info, .. } | Binary::Remote(info) => semver::VersionReq {
-                        comparators: vec![
-                            Comparator {
-                                op: semver::Op::GreaterEq,
-                                major: info.first_supported_solc_version.major,
-                                minor: Some(info.first_supported_solc_version.minor),
-                                patch: Some(info.first_supported_solc_version.patch),
-                                pre: Prerelease::default(),
-                            },
-                            Comparator {
-                                op: semver::Op::LessEq,
-                                major: info.last_supported_solc_version.major,
-                                minor: Some(info.last_supported_solc_version.minor),
-                                patch: Some(info.last_supported_solc_version.patch),
-                                pre: Prerelease::default(),
-                            },
-                        ],
-                    },
-                };
                 bin.local()
                     .map(|path| {
                         Ok(Self {
                             resolc_version: bin.version().to_owned(),
                             resolc: path.to_owned(),
                             solc: solc_compiler,
-                            supported_solc_versions,
+                            supported_solc_versions: binary_compat_info(&bin),
                         })
                     })
                     .transpose()
@@ -193,33 +196,14 @@ impl Resolc {
                         }
                     }
                 };
-                let supported_solc_versions = match &binary {
-                    Binary::Local { info, .. } | Binary::Remote(info) => semver::VersionReq {
-                        comparators: vec![
-                            Comparator {
-                                op: semver::Op::GreaterEq,
-                                major: info.first_supported_solc_version.major,
-                                minor: Some(info.first_supported_solc_version.minor),
-                                patch: Some(info.first_supported_solc_version.patch),
-                                pre: Prerelease::default(),
-                            },
-                            Comparator {
-                                op: semver::Op::LessEq,
-                                major: info.last_supported_solc_version.major,
-                                minor: Some(info.last_supported_solc_version.minor),
-                                patch: Some(info.last_supported_solc_version.patch),
-                                pre: Prerelease::default(),
-                            },
-                        ],
-                    },
-                };
+
                 let path = binary.local().expect("Can't happen to a local install");
 
                 Ok(Self {
                     resolc_version: binary.version().to_owned(),
                     resolc: path.to_owned(),
                     solc: solc_compiler,
-                    supported_solc_versions,
+                    supported_solc_versions: binary_compat_info(&binary),
                 })
             })
         })
