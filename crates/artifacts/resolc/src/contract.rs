@@ -49,7 +49,9 @@ impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
         let meta = match contract.metadata.as_ref() {
             Some(serde_json::Value::Object(map)) => {
                 map.get("solc_metadata")
-                    .and_then(|solc_metadata| serde_json::from_value::<LosslessMetadata>(solc_metadata.clone()).ok())
+                    .and_then(|solc_metadata| {
+                        serde_json::from_value::<LosslessMetadata>(solc_metadata.clone()).ok()
+                    })
                     .map(|mut solc_metadata| {
                         // Extract and inject revive compiler information if available.
                         if let (Some(revive_version), Some(solc_version)) = (
