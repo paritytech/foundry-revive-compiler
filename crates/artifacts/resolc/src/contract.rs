@@ -54,12 +54,15 @@ impl From<ResolcContract> for foundry_compilers_artifacts_solc::Contract {
                         // Extract and inject revive compiler information if available.
                         if let (Some(revive_version), Some(solc_version)) = (
                             map.get("revive_version").and_then(|v| v.as_str()),
-                            map.get("solc_version").and_then(|v| v.as_str())
+                            map.get("solc_version").and_then(|v| v.as_str()),
                         ) {
                             // Update version and regenerate raw metadata.
-                            solc_metadata.metadata.compiler.version = format!("{{\"revive\":\"{}\", \"solc\":\"{}\"}}", revive_version, solc_version);
+                            solc_metadata.metadata.compiler.version = format!(
+                                "{{\"revive\":\"{revive_version}\", \"solc\":\"{solc_version}\"}}"
+                            );
 
-                            if let Ok(raw_metadata) = serde_json::to_string(&solc_metadata.metadata) {
+                            if let Ok(raw_metadata) = serde_json::to_string(&solc_metadata.metadata)
+                            {
                                 solc_metadata.raw_metadata = raw_metadata;
                             }
                         }
