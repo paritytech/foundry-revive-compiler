@@ -103,7 +103,9 @@ mod tests {
         });
         let solc_metadata_string = serde_json::to_string(&meta).unwrap();
         match revive_version {
-            Some(revive) => json!({ "solc_metadata": solc_metadata_string, "revive_version": revive }),
+            Some(revive) => {
+                json!({ "solc_metadata": solc_metadata_string, "revive_version": revive })
+            }
             None => json!({ "solc_metadata": solc_metadata_string }),
         }
     }
@@ -140,7 +142,14 @@ mod tests {
 
         assert_eq!(solc_contract.metadata.as_ref().unwrap().metadata.compiler.version, "0.8.19");
 
-        assert!(!solc_contract.metadata.as_ref().unwrap().metadata.compiler.additional_information.contains_key("revive_version"));
+        assert!(!solc_contract
+            .metadata
+            .as_ref()
+            .unwrap()
+            .metadata
+            .compiler
+            .additional_information
+            .contains_key("revive_version"));
 
         // With revive_version
         let contract = make_contract(Some(make_solc_metadata("0.8.19", Some("0.1.0-dev.13"))));
@@ -148,7 +157,10 @@ mod tests {
         let meta = solc_contract.metadata.unwrap();
 
         assert_eq!(meta.metadata.compiler.version, "0.8.19");
-        assert_eq!(meta.metadata.compiler.additional_information["revive_version"], json!("0.1.0-dev.13"));
+        assert_eq!(
+            meta.metadata.compiler.additional_information["revive_version"],
+            json!("0.1.0-dev.13")
+        );
     }
 
     #[test]
